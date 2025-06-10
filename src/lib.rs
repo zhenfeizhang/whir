@@ -9,6 +9,7 @@ pub mod domain; // Domain that we are evaluating over
 pub mod ntt;
 pub mod parameters;
 pub mod poly_utils; // Utils for polynomials
-                    // pub mod sumcheck; // Sumcheck specialised
-                    // pub mod utils; // Utils in general
-                    // pub mod whir; // The real prover
+
+pub mod sumcheck; // Sumcheck specialised
+                  // pub mod utils; // Utils in general
+                  // pub mod whir; // The real prover
