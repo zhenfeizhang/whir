@@ -1,7 +1,8 @@
 use std::{fmt::Debug, ops::Index};
 
-use ark_ff::Field;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+// use ark_ff::Field;
+// use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use arith::Field;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -19,8 +20,9 @@ use crate::poly_utils::{
 ///
 /// - Evaluation mode: Represents an equality constraint at a specific `MultilinearPoint<F>`.
 /// - Linear mode: Represents a set of per-corner weights stored as `EvaluationsList<F>`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+// #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+// #[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
 pub enum Weights<F> {
     /// Represents a weight function that enforces equality constraints at a specific point.
     Evaluation { point: MultilinearPoint<F> },
@@ -200,8 +202,9 @@ impl<F: Field> Weights<F> {
 /// \begin{equation}
 /// W(X) = w_1(X) + \gamma w_2(X) + \gamma^2 w_3(X) + \dots + \gamma^{k-1} w_k(X)
 /// \end{equation}
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+// #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+// #[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
 pub struct Statement<F> {
     /// Number of variables defining the polynomial space.
     num_variables: usize,
@@ -213,12 +216,13 @@ pub struct Statement<F> {
 }
 
 /// A constraint as a weight function and a target sum.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+// #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+// #[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
 pub struct Constraint<F> {
     pub weights: Weights<F>,
 
-    #[serde(with = "crate::ark_serde")]
+    // #[serde(with = "crate::ark_serde")]
     pub sum: F,
 
     /// When set, the weight evaluation will not be checked by the WHIR verifier,
@@ -329,14 +333,15 @@ impl<F: Field> Statement<F> {
 #[cfg(test)]
 mod tests {
     use ark_ff::AdditiveGroup;
+    use goldilocks::Goldilocks;
 
     use super::*;
-    use crate::{crypto::fields::Field64, utils::eval_eq};
+    use crate::{ utils::eval_eq};
 
     #[test]
     fn test_weights_evaluation() {
         // Define a point in the multilinear space
-        let point = MultilinearPoint(vec![Field64::ONE, Field64::ZERO]);
+        let point = MultilinearPoint(vec![Goldilocks::ONE, Goldilocks::ZERO]);
         let weight = Weights::evaluation(point);
 
         // The number of variables in the weight should match the number of variables in the point
@@ -347,10 +352,10 @@ mod tests {
     fn test_weights_linear() {
         // Define a list of evaluation values
         let evals = EvaluationsList::new(vec![
-            Field64::ONE,
-            Field64::from(2),
-            Field64::from(3),
-            Field64::from(3),
+            Goldilocks::ONE,
+            Goldilocks::from(2u32),
+            Goldilocks::from(3u32),
+            Goldilocks::from(3u32),
         ]);
         let weight = Weights::linear(evals);
 
@@ -361,12 +366,12 @@ mod tests {
     #[test]
     fn test_weighted_sum_evaluation() {
         // Define polynomial evaluations at different points
-        let e0 = Field64::from(3);
-        let e1 = Field64::from(5);
+        let e0 = Goldilocks::from(3u32);
+        let e1 = Goldilocks::from(5u32);
         let evals = EvaluationsList::new(vec![e0, e1]);
 
         // Define an evaluation weight at a specific point
-        let point = MultilinearPoint(vec![Field64::ONE]);
+        let point = MultilinearPoint(vec![Goldilocks::ONE]);
         let weight = Weights::evaluation(point);
 
         // Expected result: polynomial evaluation at the given point
@@ -378,13 +383,13 @@ mod tests {
     #[test]
     fn test_weighted_sum_linear() {
         // Define polynomial evaluations
-        let e0 = Field64::ONE;
-        let e1 = Field64::from(2);
+        let e0 = Goldilocks::ONE;
+        let e1 = Goldilocks::from(2u32);
         let evals = EvaluationsList::new(vec![e0, e1]);
 
         // Define linear weights
-        let w0 = Field64::from(2);
-        let w1 = Field64::from(3);
+        let w0 = Goldilocks::from(2u32);
+        let w1 = Goldilocks::from(3u32);
         let weight_list = EvaluationsList::new(vec![w0, w1]);
         let weight = Weights::linear(weight_list);
 
@@ -401,16 +406,16 @@ mod tests {
     #[test]
     fn test_accumulate_linear() {
         // Initialize an empty accumulator
-        let mut accumulator = EvaluationsList::new(vec![Field64::ZERO, Field64::ZERO]);
+        let mut accumulator = EvaluationsList::new(vec![Goldilocks::ZERO, Goldilocks::ZERO]);
 
         // Define weights
-        let w0 = Field64::from(2);
-        let w1 = Field64::from(3);
+        let w0 = Goldilocks::from(2u32);
+        let w1 = Goldilocks::from(3u32);
         let weight_list = EvaluationsList::new(vec![w0, w1]);
         let weight = Weights::linear(weight_list);
 
         // Define a multiplication factor
-        let factor = Field64::from(4);
+        let factor = Goldilocks::from(4u32);
 
         // Accumulate weighted values
         weight.accumulate(&mut accumulator, factor);
@@ -431,20 +436,20 @@ mod tests {
     #[test]
     fn test_accumulate_evaluation() {
         // Initialize an empty accumulator
-        let mut accumulator = EvaluationsList::new(vec![Field64::ZERO, Field64::ZERO]);
+        let mut accumulator = EvaluationsList::new(vec![Goldilocks::ZERO, Goldilocks::ZERO]);
 
         // Define an evaluation point
-        let point = MultilinearPoint(vec![Field64::ONE]);
+        let point = MultilinearPoint(vec![Goldilocks::ONE]);
         let weight = Weights::evaluation(point.clone());
 
         // Define a multiplication factor
-        let factor = Field64::from(5);
+        let factor = Goldilocks::from(5u32);
 
         // Accumulate weighted values
         weight.accumulate(&mut accumulator, factor);
 
         // Compute expected result manually
-        let mut expected = vec![Field64::ZERO, Field64::ZERO];
+        let mut expected = vec![Goldilocks::ZERO, Goldilocks::ZERO];
         eval_eq(&point.0, &mut expected, factor);
 
         assert_eq!(accumulator.evals(), &expected);
@@ -456,17 +461,17 @@ mod tests {
         let mut statement = Statement::new(1);
 
         // Define weights
-        let w0 = Field64::from(3);
-        let w1 = Field64::from(5);
+        let w0 = Goldilocks::from(3u32);
+        let w1 = Goldilocks::from(5u32);
         let weight_list = EvaluationsList::new(vec![w0, w1]);
         let weight = Weights::linear(weight_list);
 
         // Define sum constraint
-        let sum = Field64::from(7);
+        let sum = Goldilocks::from(7u32);
         statement.add_constraint(weight, sum);
 
         // Define a challenge factor
-        let challenge = Field64::from(2);
+        let challenge = Goldilocks::from(2u32);
 
         // Compute combined evaluations and sum
         let (combined_evals, combined_sum) = statement.combine(challenge);
@@ -490,24 +495,24 @@ mod tests {
         let mut statement = Statement::new(2);
 
         // Define weights for first constraint (2 variables => 4 evaluations)
-        let w0 = Field64::from(1);
-        let w1 = Field64::from(2);
-        let w2 = Field64::from(3);
-        let w3 = Field64::from(4);
+        let w0 = Goldilocks::from(1u32);
+        let w1 = Goldilocks::from(2u32);
+        let w2 = Goldilocks::from(3u32);
+        let w3 = Goldilocks::from(4u32);
         let weight_list1 = EvaluationsList::new(vec![w0, w1, w2, w3]);
         let weight1 = Weights::linear(weight_list1);
 
         // Define weights for second constraint (also 2 variables => 4 evaluations)
-        let w4 = Field64::from(5);
-        let w5 = Field64::from(6);
-        let w6 = Field64::from(7);
-        let w7 = Field64::from(8);
+        let w4 = Goldilocks::from(5u32);
+        let w5 = Goldilocks::from(6u32);
+        let w6 = Goldilocks::from(7u32);
+        let w7 = Goldilocks::from(8u32);
         let weight_list2 = EvaluationsList::new(vec![w4, w5, w6, w7]);
         let weight2 = Weights::linear(weight_list2);
 
         // Define sum constraints
-        let sum1 = Field64::from(5);
-        let sum2 = Field64::from(7);
+        let sum1 = Goldilocks::from(5u32);
+        let sum2 = Goldilocks::from(7u32);
 
         // Ensure both weight lists match the expected number of variables
         assert_eq!(weight1.num_variables(), 2);
@@ -518,7 +523,7 @@ mod tests {
         statement.add_constraint(weight2, sum2);
 
         // Define a challenge factor
-        let challenge = Field64::from(2);
+        let challenge = Goldilocks::from(2u32);
 
         // Compute combined evaluations and sum
         let (combined_evals, combined_sum) = statement.combine(challenge);
@@ -549,11 +554,11 @@ mod tests {
     #[test]
     fn test_compute_evaluation_weight() {
         // Define an evaluation weight at a specific point
-        let point = MultilinearPoint(vec![Field64::from(3)]);
+        let point = MultilinearPoint(vec![Goldilocks::from(3u32)]);
         let weight = Weights::evaluation(point.clone());
 
         // Define a randomness point for folding
-        let folding_randomness = MultilinearPoint(vec![Field64::from(2)]);
+        let folding_randomness = MultilinearPoint(vec![Goldilocks::from(2u32)]);
 
         // Expected result is the evaluation of eq_poly_outside at the given randomness
         let expected = point.eq_poly_outside(&folding_randomness);
@@ -565,7 +570,7 @@ mod tests {
     #[allow(clippy::redundant_clone)]
     fn test_compute_evaluation_weight_identity() {
         // Define an evaluation weight at a specific point
-        let point = MultilinearPoint(vec![Field64::ONE, Field64::ZERO]);
+        let point = MultilinearPoint(vec![Goldilocks::ONE, Goldilocks::ZERO]);
 
         // Folding randomness is the same as the point itself
         let folding_randomness = point.clone();
