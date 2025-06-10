@@ -5,7 +5,7 @@ use std::{fmt::Debug, ops::Index};
 use arith::Field;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
