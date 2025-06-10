@@ -36,7 +36,7 @@ redundant_closure_for_method_calls = "allow"
 ark-std = { version = "0.5", features = ["std"] }
 ark-ff = { version = "0.5", features = ["asm", "std"] }
 # ark-serialize = "0.5"
-# ark-crypto-primitives = { version = "0.5", features = ["merkle_tree"] }
+ark-crypto-primitives = { version = "0.5", features = ["merkle_tree"] }
 ark-poly = "0.5"
 
 arith = { path = "../../Expander/arith" }

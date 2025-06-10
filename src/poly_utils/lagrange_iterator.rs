@@ -1,6 +1,8 @@
 // NOTE: This is the one from Blendy
 
-use ark_ff::Field;
+// use ark_ff::Field;
+
+use arith::Field;
 
 use super::{hypercube::BinaryHypercubePoint, multilinear::MultilinearPoint};
 
@@ -131,19 +133,20 @@ impl<F: Field> Iterator for LagrangePolynomialIterator<F> {
 #[cfg(test)]
 mod tests {
     use ark_ff::AdditiveGroup;
+    use goldilocks::Goldilocks;
 
     use super::*;
     use crate::{
-        crypto::fields::Field64,
+        // crypto::fields::Field64,
         poly_utils::{hypercube::BinaryHypercubePoint, multilinear::MultilinearPoint},
     };
 
-    type F = Field64;
+    type F = Goldilocks;
 
     #[test]
     fn test_blendy() {
-        let one = F::from(1);
-        let (a, b) = (F::from(2), F::from(3));
+        let one = F::from(1u32);
+        let (a, b) = (F::from(2u32), F::from(3u32));
         let point_1 = MultilinearPoint(vec![a, b]);
 
         let mut lag_iterator = LagrangePolynomialIterator::from(&point_1);
@@ -169,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_blendy_2() {
-        let point = MultilinearPoint(vec![F::from(12), F::from(13), F::from(32)]);
+        let point = MultilinearPoint(vec![F::from(12u32), F::from(13u32), F::from(32u32)]);
 
         let mut last_b = None;
         for (b, lag) in LagrangePolynomialIterator::from(&point) {
@@ -183,11 +186,11 @@ mod tests {
     #[test]
     fn test_blendy_3() {
         let point = MultilinearPoint(vec![
-            F::from(414_151),
-            F::from(109_849_018),
-            F::from(33_184_190),
-            F::from(33_184_190),
-            F::from(33_184_190),
+            F::from(414_151u32),
+            F::from(109_849_018u32),
+            F::from(33_184_190u32),
+            F::from(33_184_190u32),
+            F::from(33_184_190u32),
         ]);
 
         let mut last_b = None;
@@ -200,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_lagrange_iterator_single_variable() {
-        let point = MultilinearPoint(vec![F::from(3)]);
+        let point = MultilinearPoint(vec![F::from(3u32)]);
         let mut iter = LagrangePolynomialIterator::from(&point);
 
         // Expected values: (0, 1 - p) and (1, p)
@@ -214,7 +217,7 @@ mod tests {
 
     #[test]
     fn test_lagrange_iterator_two_variables() {
-        let (a, b) = (F::from(2), F::from(3));
+        let (a, b) = (F::from(2u32), F::from(3u32));
         let point = MultilinearPoint(vec![a, b]);
         let mut iter = LagrangePolynomialIterator::from(&point);
 
@@ -271,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_lagrange_iterator_mixed_values() {
-        let (a, b, c) = (F::from(2), F::from(3), F::from(4));
+        let (a, b, c) = (F::from(2u32), F::from(3u32), F::from(4u32));
         let point = MultilinearPoint(vec![a, b, c]);
         let mut iter = LagrangePolynomialIterator::from(&point);
 
@@ -290,7 +293,12 @@ mod tests {
 
     #[test]
     fn test_lagrange_iterator_four_variables() {
-        let point = MultilinearPoint(vec![F::from(1), F::from(2), F::from(3), F::from(4)]);
+        let point = MultilinearPoint(vec![
+            F::from(1u32),
+            F::from(2u32),
+            F::from(3u32),
+            F::from(4u32),
+        ]);
         let mut iter = LagrangePolynomialIterator::from(&point);
 
         // Ensure the iterator completes all 2^4 = 16 elements
@@ -303,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_lagrange_iterator_correct_order() {
-        let point = MultilinearPoint(vec![F::from(5), F::from(7)]);
+        let point = MultilinearPoint(vec![F::from(5u32), F::from(7u32)]);
         let mut iter = LagrangePolynomialIterator::from(&point);
 
         // Expect values in **binary order**: 0b00, 0b01, 0b10, 0b11
@@ -321,7 +329,7 @@ mod tests {
     #[test]
     fn test_lagrange_iterator_output_count() {
         let num_vars = 5;
-        let point = MultilinearPoint(vec![F::from(3); num_vars]);
+        let point = MultilinearPoint(vec![F::from(3u32); num_vars]);
         let iter = LagrangePolynomialIterator::from(&point);
 
         // The iterator should yield exactly 2^num_vars elements

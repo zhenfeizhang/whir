@@ -1,5 +1,6 @@
-use ark_ff::Field;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+// use ark_ff::Field;
+// use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use arith::Field;
 use rand::{distributions::Standard, prelude::Distribution, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 
@@ -8,9 +9,13 @@ use super::hypercube::BinaryHypercubePoint;
 /// A point `(x_1, ..., x_n)` in `F^n` for some field `F`.
 ///
 /// Often, `x_i` are binary. If strictly binary, `BinaryHypercubePoint` is used.
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
-pub struct MultilinearPoint<F>(#[serde(with = "crate::ark_serde")] pub Vec<F>);
+// #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+// #[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
+pub struct MultilinearPoint<F>(
+    // #[serde(with = "crate::ark_serde")]
+    pub Vec<F>,
+);
 
 impl<F> MultilinearPoint<F>
 where
@@ -144,7 +149,7 @@ where
     /// Uses precomputed values to reduce redundant operations.
     pub fn eq_poly3(&self, mut point: usize) -> F {
         let two = F::ONE + F::ONE;
-        let two_inv = two.inverse().unwrap();
+        let two_inv = two.inv().unwrap();
 
         let n_variables = self.num_variables();
         assert!(point < 3usize.pow(n_variables as u32));
@@ -169,12 +174,12 @@ where
     }
 }
 
-impl<F> MultilinearPoint<F>
-where
-    Standard: Distribution<F>,
+impl<F: Field> MultilinearPoint<F>
+// where
+//     Standard: Distribution<F>,
 {
-    pub fn rand(rng: &mut impl RngCore, num_variables: usize) -> Self {
-        Self((0..num_variables).map(|_| rng.gen()).collect())
+    pub fn rand(mut rng: &mut impl RngCore, num_variables: usize) -> Self {
+        Self((0..num_variables).map(|_| F::random_unsafe(&mut rng)).collect())
     }
 }
 
@@ -192,16 +197,20 @@ impl<F> From<F> for MultilinearPoint<F> {
     clippy::should_panic_without_expect
 )]
 mod tests {
-    use ark_ff::AdditiveGroup;
+    use goldilocks::Goldilocks;
+    // use ark_ff::AdditiveGroup;
     use rand::thread_rng;
 
     use super::*;
-    use crate::crypto::fields::Field64;
+    // use crate::crypto::fields::Goldilocks;
 
     #[test]
     fn test_n_variables() {
-        let point =
-            MultilinearPoint::<Field64>(vec![Field64::from(1), Field64::from(0), Field64::from(1)]);
+        let point = MultilinearPoint::<Goldilocks>(vec![
+            Goldilocks::from(1u32),
+            Goldilocks::from(0u32),
+            Goldilocks::from(1u32),
+        ]);
         assert_eq!(point.num_variables(), 3);
     }
 
@@ -210,10 +219,12 @@ mod tests {
         let num_variables = 5;
         // Represents (0,0,0,0,0)
         let binary_point = BinaryHypercubePoint(0);
-        let ml_point =
-            MultilinearPoint::<Field64>::from_binary_hypercube_point(binary_point, num_variables);
+        let ml_point = MultilinearPoint::<Goldilocks>::from_binary_hypercube_point(
+            binary_point,
+            num_variables,
+        );
 
-        let expected = vec![Field64::ZERO; num_variables];
+        let expected = vec![Goldilocks::ZERO; num_variables];
         assert_eq!(ml_point.0, expected);
     }
 
@@ -222,10 +233,12 @@ mod tests {
         let num_variables = 4;
         // Represents (1,1,1,1)
         let binary_point = BinaryHypercubePoint((1 << num_variables) - 1);
-        let ml_point =
-            MultilinearPoint::<Field64>::from_binary_hypercube_point(binary_point, num_variables);
+        let ml_point = MultilinearPoint::<Goldilocks>::from_binary_hypercube_point(
+            binary_point,
+            num_variables,
+        );
 
-        let expected = vec![Field64::ONE; num_variables];
+        let expected = vec![Goldilocks::ONE; num_variables];
         assert_eq!(ml_point.0, expected);
     }
 
@@ -234,16 +247,18 @@ mod tests {
         let num_variables = 6;
         // Represents (1,0,1,0,1,0)
         let binary_point = BinaryHypercubePoint(0b10_1010);
-        let ml_point =
-            MultilinearPoint::<Field64>::from_binary_hypercube_point(binary_point, num_variables);
+        let ml_point = MultilinearPoint::<Goldilocks>::from_binary_hypercube_point(
+            binary_point,
+            num_variables,
+        );
 
         let expected = vec![
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ];
         assert_eq!(ml_point.0, expected);
     }
@@ -253,10 +268,12 @@ mod tests {
         let num_variables = 3;
         // Should only use last 3 bits (101)
         let binary_point = BinaryHypercubePoint(0b10101);
-        let ml_point =
-            MultilinearPoint::<Field64>::from_binary_hypercube_point(binary_point, num_variables);
+        let ml_point = MultilinearPoint::<Goldilocks>::from_binary_hypercube_point(
+            binary_point,
+            num_variables,
+        );
 
-        let expected = vec![Field64::ONE, Field64::ZERO, Field64::ONE];
+        let expected = vec![Goldilocks::ONE, Goldilocks::ZERO, Goldilocks::ONE];
         assert_eq!(ml_point.0, expected);
     }
 
@@ -265,18 +282,20 @@ mod tests {
         let num_variables = 8;
         // Represents (0,0,0,0,1,0,1,0)
         let binary_point = BinaryHypercubePoint(0b1010);
-        let ml_point =
-            MultilinearPoint::<Field64>::from_binary_hypercube_point(binary_point, num_variables);
+        let ml_point = MultilinearPoint::<Goldilocks>::from_binary_hypercube_point(
+            binary_point,
+            num_variables,
+        );
 
         let expected = vec![
-            Field64::ZERO,
-            Field64::ZERO,
-            Field64::ZERO,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ZERO,
+            Goldilocks::ZERO,
+            Goldilocks::ZERO,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ];
         assert_eq!(ml_point.0, expected);
     }
@@ -284,51 +303,56 @@ mod tests {
     #[test]
     fn test_to_hypercube_all_zeros() {
         let point = MultilinearPoint(vec![
-            Field64::ZERO,
-            Field64::ZERO,
-            Field64::ZERO,
-            Field64::ZERO,
+            Goldilocks::ZERO,
+            Goldilocks::ZERO,
+            Goldilocks::ZERO,
+            Goldilocks::ZERO,
         ]);
         assert_eq!(point.to_hypercube(), Some(BinaryHypercubePoint(0)));
     }
 
     #[test]
     fn test_to_hypercube_all_ones() {
-        let point = MultilinearPoint(vec![Field64::ONE, Field64::ONE, Field64::ONE, Field64::ONE]);
+        let point = MultilinearPoint(vec![
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+        ]);
         assert_eq!(point.to_hypercube(), Some(BinaryHypercubePoint(0b1111)));
     }
 
     #[test]
     fn test_to_hypercube_mixed_bits() {
         let point = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         assert_eq!(point.to_hypercube(), Some(BinaryHypercubePoint(0b1010)));
     }
 
     #[test]
     fn test_to_hypercube_single_bit() {
-        let point = MultilinearPoint(vec![Field64::ONE]);
+        let point = MultilinearPoint(vec![Goldilocks::ONE]);
         assert_eq!(point.to_hypercube(), Some(BinaryHypercubePoint(1)));
 
-        let point = MultilinearPoint(vec![Field64::ZERO]);
+        let point = MultilinearPoint(vec![Goldilocks::ZERO]);
         assert_eq!(point.to_hypercube(), Some(BinaryHypercubePoint(0)));
     }
 
     #[test]
     fn test_to_hypercube_large_binary_number() {
         let point = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         assert_eq!(
             point.to_hypercube(),
@@ -338,20 +362,20 @@ mod tests {
 
     #[test]
     fn test_to_hypercube_non_binary_values() {
-        let invalid_value = Field64::from(2);
-        let point = MultilinearPoint(vec![Field64::ONE, invalid_value, Field64::ZERO]);
+        let invalid_value = Goldilocks::from(2u32);
+        let point = MultilinearPoint(vec![Goldilocks::ONE, invalid_value, Goldilocks::ZERO]);
         assert_eq!(point.to_hypercube(), None);
     }
 
     #[test]
     fn test_to_hypercube_empty_vector() {
-        let point = MultilinearPoint::<Field64>(vec![]);
+        let point = MultilinearPoint::<Goldilocks>(vec![]);
         assert_eq!(point.to_hypercube(), Some(BinaryHypercubePoint(0)));
     }
 
     #[test]
     fn test_expand_from_univariate_single_variable() {
-        let point = Field64::from(3);
+        let point = Goldilocks::from(3u32);
         let expanded = MultilinearPoint::expand_from_univariate(point, 1);
 
         // For n = 1, we expect [y]
@@ -360,7 +384,7 @@ mod tests {
 
     #[test]
     fn test_expand_from_univariate_two_variables() {
-        let point = Field64::from(2);
+        let point = Goldilocks::from(2u32);
         let expanded = MultilinearPoint::expand_from_univariate(point, 2);
 
         // For n = 2, we expect [y^2, y]
@@ -370,25 +394,25 @@ mod tests {
 
     #[test]
     fn test_expand_from_univariate_three_variables() {
-        let point = Field64::from(5);
+        let point = Goldilocks::from(5u32);
         let expanded = MultilinearPoint::expand_from_univariate(point, 3);
 
         // For n = 3, we expect [y^4, y^2, y]
-        let expected = vec![point.pow([4]), point.pow([2]), point];
+        let expected = vec![point.exp(4u128), point.exp(2u128), point];
         assert_eq!(expanded.0, expected);
     }
 
     #[test]
     fn test_expand_from_univariate_large_variables() {
-        let point = Field64::from(7);
+        let point = Goldilocks::from(7u32);
         let expanded = MultilinearPoint::expand_from_univariate(point, 5);
 
         // For n = 5, we expect [y^16, y^8, y^4, y^2, y]
         let expected = vec![
-            point.pow([16]),
-            point.pow([8]),
-            point.pow([4]),
-            point.pow([2]),
+            point.exp(16u128),
+            point.exp(8u128),
+            point.exp(4u128),
+            point.exp(2u128),
             point,
         ];
         assert_eq!(expanded.0, expected);
@@ -396,27 +420,27 @@ mod tests {
 
     #[test]
     fn test_expand_from_univariate_identity() {
-        let point = Field64::ONE;
+        let point = Goldilocks::ONE;
         let expanded = MultilinearPoint::expand_from_univariate(point, 4);
 
         // Since 1^k = 1 for all k, the result should be [1, 1, 1, 1]
-        let expected = vec![Field64::ONE; 4];
+        let expected = vec![Goldilocks::ONE; 4];
         assert_eq!(expanded.0, expected);
     }
 
     #[test]
     fn test_expand_from_univariate_zero() {
-        let point = Field64::ZERO;
+        let point = Goldilocks::ZERO;
         let expanded = MultilinearPoint::expand_from_univariate(point, 4);
 
         // Since 0^k = 0 for all k, the result should be [0, 0, 0, 0]
-        let expected = vec![Field64::ZERO; 4];
+        let expected = vec![Goldilocks::ZERO; 4];
         assert_eq!(expanded.0, expected);
     }
 
     #[test]
     fn test_expand_from_univariate_empty() {
-        let point = Field64::from(9);
+        let point = Goldilocks::from(9u32);
         let expanded = MultilinearPoint::expand_from_univariate(point, 0);
 
         // No variables should return an empty vector
@@ -425,16 +449,16 @@ mod tests {
 
     #[test]
     fn test_expand_from_univariate_powers_correctness() {
-        let point = Field64::from(3);
+        let point = Goldilocks::from(3u32);
         let expanded = MultilinearPoint::expand_from_univariate(point, 6);
 
         // For n = 6, we expect [y^32, y^16, y^8, y^4, y^2, y]
         let expected = vec![
-            point.pow([32]),
-            point.pow([16]),
-            point.pow([8]),
-            point.pow([4]),
-            point.pow([2]),
+            point.exp(32u128),
+            point.exp(16u128),
+            point.exp(8u128),
+            point.exp(4u128),
+            point.exp(2u128),
             point,
         ];
         assert_eq!(expanded.0, expected);
@@ -443,254 +467,254 @@ mod tests {
     #[test]
     fn test_eq_poly_all_zeros() {
         // Multilinear point (0,0,0,0)
-        let ml_point = MultilinearPoint(vec![Field64::ZERO; 4]);
+        let ml_point = MultilinearPoint(vec![Goldilocks::ZERO; 4]);
         let binary_point = BinaryHypercubePoint(0b0000);
 
         // eq_poly should evaluate to 1 since c_i = p_i = 0
-        assert_eq!(ml_point.eq_poly(binary_point), Field64::ONE);
+        assert_eq!(ml_point.eq_poly(binary_point), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly_all_ones() {
         // Multilinear point (1,1,1,1)
-        let ml_point = MultilinearPoint(vec![Field64::ONE; 4]);
+        let ml_point = MultilinearPoint(vec![Goldilocks::ONE; 4]);
         let binary_point = BinaryHypercubePoint(0b1111);
 
         // eq_poly should evaluate to 1 since c_i = p_i = 1
-        assert_eq!(ml_point.eq_poly(binary_point), Field64::ONE);
+        assert_eq!(ml_point.eq_poly(binary_point), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly_mixed_bits_match() {
         // Multilinear point (1,0,1,0)
         let ml_point = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         let binary_point = BinaryHypercubePoint(0b1010);
 
         // eq_poly should evaluate to 1 since c_i = p_i for all i
-        assert_eq!(ml_point.eq_poly(binary_point), Field64::ONE);
+        assert_eq!(ml_point.eq_poly(binary_point), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly_mixed_bits_mismatch() {
         // Multilinear point (1,0,1,0)
         let ml_point = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         let binary_point = BinaryHypercubePoint(0b1100); // Differs at second bit
 
         // eq_poly should evaluate to 0 since there is at least one mismatch
-        assert_eq!(ml_point.eq_poly(binary_point), Field64::ZERO);
+        assert_eq!(ml_point.eq_poly(binary_point), Goldilocks::ZERO);
     }
 
     #[test]
     fn test_eq_poly_single_variable_match() {
         // Multilinear point (1)
-        let ml_point = MultilinearPoint(vec![Field64::ONE]);
+        let ml_point = MultilinearPoint(vec![Goldilocks::ONE]);
         let binary_point = BinaryHypercubePoint(0b1);
 
         // eq_poly should evaluate to 1 since c_1 = p_1 = 1
-        assert_eq!(ml_point.eq_poly(binary_point), Field64::ONE);
+        assert_eq!(ml_point.eq_poly(binary_point), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly_single_variable_mismatch() {
         // Multilinear point (1)
-        let ml_point = MultilinearPoint(vec![Field64::ONE]);
+        let ml_point = MultilinearPoint(vec![Goldilocks::ONE]);
         let binary_point = BinaryHypercubePoint(0b0);
 
         // eq_poly should evaluate to 0 since c_1 != p_1
-        assert_eq!(ml_point.eq_poly(binary_point), Field64::ZERO);
+        assert_eq!(ml_point.eq_poly(binary_point), Goldilocks::ZERO);
     }
 
     #[test]
     fn test_eq_poly_large_binary_number_match() {
         // Multilinear point (1,1,0,1,0,1,1,0)
         let ml_point = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         let binary_point = BinaryHypercubePoint(0b1101_0110);
 
         // eq_poly should evaluate to 1 since c_i = p_i for all i
-        assert_eq!(ml_point.eq_poly(binary_point), Field64::ONE);
+        assert_eq!(ml_point.eq_poly(binary_point), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly_large_binary_number_mismatch() {
         // Multilinear point (1,1,0,1,0,1,1,0)
         let ml_point = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         let binary_point = BinaryHypercubePoint(0b1101_0111); // Last bit differs
 
         // eq_poly should evaluate to 0 since there is a mismatch
-        assert_eq!(ml_point.eq_poly(binary_point), Field64::ZERO);
+        assert_eq!(ml_point.eq_poly(binary_point), Goldilocks::ZERO);
     }
 
     #[test]
     fn test_eq_poly_empty_vector() {
         // Empty Multilinear Point
-        let ml_point = MultilinearPoint::<Field64>(vec![]);
+        let ml_point = MultilinearPoint::<Goldilocks>(vec![]);
         let binary_point = BinaryHypercubePoint(0);
 
         // eq_poly should evaluate to 1 since both are trivially equal
-        assert_eq!(ml_point.eq_poly(binary_point), Field64::ONE);
+        assert_eq!(ml_point.eq_poly(binary_point), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly_outside_all_zeros() {
-        let ml_point1 = MultilinearPoint(vec![Field64::ZERO; 4]);
-        let ml_point2 = MultilinearPoint(vec![Field64::ZERO; 4]);
+        let ml_point1 = MultilinearPoint(vec![Goldilocks::ZERO; 4]);
+        let ml_point2 = MultilinearPoint(vec![Goldilocks::ZERO; 4]);
 
-        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Field64::ONE);
+        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly_outside_all_ones() {
-        let ml_point1 = MultilinearPoint(vec![Field64::ONE; 4]);
-        let ml_point2 = MultilinearPoint(vec![Field64::ONE; 4]);
+        let ml_point1 = MultilinearPoint(vec![Goldilocks::ONE; 4]);
+        let ml_point2 = MultilinearPoint(vec![Goldilocks::ONE; 4]);
 
-        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Field64::ONE);
+        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly_outside_mixed_match() {
         let ml_point1 = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         let ml_point2 = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
 
-        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Field64::ONE);
+        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly_outside_mixed_mismatch() {
         let ml_point1 = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         let ml_point2 = MultilinearPoint(vec![
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
         ]);
 
-        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Field64::ZERO);
+        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Goldilocks::ZERO);
     }
 
     #[test]
     fn test_eq_poly_outside_single_variable_match() {
-        let ml_point1 = MultilinearPoint(vec![Field64::ONE]);
-        let ml_point2 = MultilinearPoint(vec![Field64::ONE]);
+        let ml_point1 = MultilinearPoint(vec![Goldilocks::ONE]);
+        let ml_point2 = MultilinearPoint(vec![Goldilocks::ONE]);
 
-        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Field64::ONE);
+        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly_outside_single_variable_mismatch() {
-        let ml_point1 = MultilinearPoint(vec![Field64::ONE]);
-        let ml_point2 = MultilinearPoint(vec![Field64::ZERO]);
+        let ml_point1 = MultilinearPoint(vec![Goldilocks::ONE]);
+        let ml_point2 = MultilinearPoint(vec![Goldilocks::ZERO]);
 
-        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Field64::ZERO);
+        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Goldilocks::ZERO);
     }
 
     #[test]
     fn test_eq_poly_outside_large_match() {
         let ml_point1 = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         let ml_point2 = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
 
-        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Field64::ONE);
+        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly_outside_large_mismatch() {
         let ml_point1 = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         let ml_point2 = MultilinearPoint(vec![
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ONE,
-            Field64::ONE, // Last bit differs
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ONE,
+            Goldilocks::ONE, // Last bit differs
         ]);
 
-        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Field64::ZERO);
+        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Goldilocks::ZERO);
     }
 
     #[test]
     fn test_eq_poly_outside_empty_vector() {
-        let ml_point1 = MultilinearPoint::<Field64>(vec![]);
-        let ml_point2 = MultilinearPoint::<Field64>(vec![]);
+        let ml_point1 = MultilinearPoint::<Goldilocks>(vec![]);
+        let ml_point2 = MultilinearPoint::<Goldilocks>(vec![]);
 
-        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Field64::ONE);
+        assert_eq!(ml_point1.eq_poly_outside(&ml_point2), Goldilocks::ONE);
     }
 
     #[test]
     #[should_panic]
     fn test_eq_poly_outside_different_lengths() {
-        let ml_point1 = MultilinearPoint(vec![Field64::ONE, Field64::ZERO]);
-        let ml_point2 = MultilinearPoint(vec![Field64::ONE, Field64::ZERO, Field64::ONE]);
+        let ml_point1 = MultilinearPoint(vec![Goldilocks::ONE, Goldilocks::ZERO]);
+        let ml_point2 = MultilinearPoint(vec![Goldilocks::ONE, Goldilocks::ZERO, Goldilocks::ONE]);
 
         // Should panic because lengths do not match
         ml_point1.eq_poly_outside(&ml_point2);
@@ -698,81 +722,91 @@ mod tests {
 
     #[test]
     fn test_eq_poly3_all_zeros() {
-        let ml_point = MultilinearPoint(vec![Field64::ZERO; 4]);
+        let ml_point = MultilinearPoint(vec![Goldilocks::ZERO; 4]);
         // (0,0,0,0) in base 3 = 0 * 3^3 + 0 * 3^2 + 0 * 3^1 + 0 * 3^0 = 0
         let ternary_point = 0;
 
-        assert_eq!(ml_point.eq_poly3(ternary_point), Field64::ONE);
+        assert_eq!(ml_point.eq_poly3(ternary_point), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly3_all_ones() {
-        let ml_point = MultilinearPoint(vec![Field64::ONE; 4]);
+        let ml_point = MultilinearPoint(vec![Goldilocks::ONE; 4]);
         // (1,1,1,1) in base 3 = 1 * 3^3 + 1 * 3^2 + 1 * 3^1 + 1 * 3^0
         let ternary_point = 1 * 3_i32.pow(3) + 1 * 3_i32.pow(2) + 1 * 3_i32.pow(1) + 1;
 
-        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Field64::ONE);
+        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly3_all_twos() {
-        let two = Field64::ONE + Field64::ONE;
+        let two = Goldilocks::ONE + Goldilocks::ONE;
         let ml_point = MultilinearPoint(vec![two; 4]);
         // (2,2,2,2) in base 3 = 2 * 3^3 + 2 * 3^2 + 2 * 3^1 + 2 * 3^0
         let ternary_point = 2 * 3_i32.pow(3) + 2 * 3_i32.pow(2) + 2 * 3_i32.pow(1) + 2;
 
-        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Field64::ONE);
+        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly3_mixed_match() {
-        let two = Field64::ONE + Field64::ONE;
-        let ml_point = MultilinearPoint(vec![two, Field64::ONE, Field64::ZERO, Field64::ONE]);
+        let two = Goldilocks::ONE + Goldilocks::ONE;
+        let ml_point = MultilinearPoint(vec![
+            two,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+        ]);
         // (2,1,0,1) in base 3 = 2 * 3^3 + 1 * 3^2 + 0 * 3^1 + 1 * 3^0
         let ternary_point = 2 * 3_i32.pow(3) + 1 * 3_i32.pow(2) + 0 * 3_i32.pow(1) + 1;
 
-        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Field64::ONE);
+        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly3_mixed_mismatch() {
-        let two = Field64::ONE + Field64::ONE;
-        let ml_point = MultilinearPoint(vec![two, Field64::ONE, Field64::ZERO, Field64::ONE]);
+        let two = Goldilocks::ONE + Goldilocks::ONE;
+        let ml_point = MultilinearPoint(vec![
+            two,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+        ]);
         // (2,2,0,1) differs at the second coordinate
         let ternary_point = 2 * 3_i32.pow(3) + 2 * 3_i32.pow(2) + 0 * 3_i32.pow(1) + 1;
 
-        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Field64::ZERO);
+        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Goldilocks::ZERO);
     }
 
     #[test]
     fn test_eq_poly3_single_variable_match() {
-        let ml_point = MultilinearPoint(vec![Field64::ONE]);
+        let ml_point = MultilinearPoint(vec![Goldilocks::ONE]);
         // (1) in base 3 = 1
         let ternary_point = 1;
 
-        assert_eq!(ml_point.eq_poly3(ternary_point), Field64::ONE);
+        assert_eq!(ml_point.eq_poly3(ternary_point), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly3_single_variable_mismatch() {
-        let ml_point = MultilinearPoint(vec![Field64::ONE]);
+        let ml_point = MultilinearPoint(vec![Goldilocks::ONE]);
         // (2) in base 3 = 2
         let ternary_point = 2;
 
-        assert_eq!(ml_point.eq_poly3(ternary_point), Field64::ZERO);
+        assert_eq!(ml_point.eq_poly3(ternary_point), Goldilocks::ZERO);
     }
 
     #[test]
     fn test_eq_poly3_large_match() {
-        let two = Field64::ONE + Field64::ONE;
+        let two = Goldilocks::ONE + Goldilocks::ONE;
         let ml_point = MultilinearPoint(vec![
             two,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
             two,
-            Field64::ONE,
+            Goldilocks::ONE,
         ]);
         // (2,1,0,1,0,2,1) in base 3 = 2 * 3^6 + 1 * 3^5 + 0 * 3^4 + 1 * 3^3 + 0 * 3^2 + 2 * 3^1 + 1
         // * 3^0
@@ -784,20 +818,20 @@ mod tests {
             + 2 * 3_i32.pow(1)
             + 1;
 
-        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Field64::ONE);
+        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Goldilocks::ONE);
     }
 
     #[test]
     fn test_eq_poly3_large_mismatch() {
-        let two = Field64::ONE + Field64::ONE;
+        let two = Goldilocks::ONE + Goldilocks::ONE;
         let ml_point = MultilinearPoint(vec![
             two,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
             two,
-            Field64::ONE,
+            Goldilocks::ONE,
         ]);
         // (2,1,0,1,1,2,1) differs at the fifth coordinate
         let ternary_point = 2 * 3_i32.pow(6)
@@ -808,21 +842,21 @@ mod tests {
             + 2 * 3_i32.pow(1)
             + 1;
 
-        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Field64::ZERO);
+        assert_eq!(ml_point.eq_poly3(ternary_point as usize), Goldilocks::ZERO);
     }
 
     #[test]
     fn test_eq_poly3_empty_vector() {
-        let ml_point = MultilinearPoint::<Field64>(vec![]);
+        let ml_point = MultilinearPoint::<Goldilocks>(vec![]);
         let ternary_point = 0;
 
-        assert_eq!(ml_point.eq_poly3(ternary_point), Field64::ONE);
+        assert_eq!(ml_point.eq_poly3(ternary_point), Goldilocks::ONE);
     }
 
     #[test]
     #[should_panic]
     fn test_eq_poly3_invalid_ternary_value() {
-        let ml_point = MultilinearPoint(vec![Field64::ONE, Field64::ZERO]);
+        let ml_point = MultilinearPoint(vec![Goldilocks::ONE, Goldilocks::ZERO]);
         let ternary_point = 9; // Invalid ternary representation (not in {0,1,2})
 
         ml_point.eq_poly3(ternary_point);
@@ -830,69 +864,93 @@ mod tests {
 
     #[test]
     fn test_equality() {
-        let point = MultilinearPoint(vec![Field64::from(0), Field64::from(0)]);
-        assert_eq!(point.eq_poly(BinaryHypercubePoint(0b00)), Field64::from(1));
-        assert_eq!(point.eq_poly(BinaryHypercubePoint(0b01)), Field64::from(0));
-        assert_eq!(point.eq_poly(BinaryHypercubePoint(0b10)), Field64::from(0));
-        assert_eq!(point.eq_poly(BinaryHypercubePoint(0b11)), Field64::from(0));
+        let point = MultilinearPoint(vec![Goldilocks::from(0u32), Goldilocks::from(0u32)]);
+        assert_eq!(
+            point.eq_poly(BinaryHypercubePoint(0b00)),
+            Goldilocks::from(1u32)
+        );
+        assert_eq!(
+            point.eq_poly(BinaryHypercubePoint(0b01)),
+            Goldilocks::from(0u32)
+        );
+        assert_eq!(
+            point.eq_poly(BinaryHypercubePoint(0b10)),
+            Goldilocks::from(0u32)
+        );
+        assert_eq!(
+            point.eq_poly(BinaryHypercubePoint(0b11)),
+            Goldilocks::from(0u32)
+        );
 
-        let point = MultilinearPoint(vec![Field64::from(1), Field64::from(0)]);
-        assert_eq!(point.eq_poly(BinaryHypercubePoint(0b00)), Field64::from(0));
-        assert_eq!(point.eq_poly(BinaryHypercubePoint(0b01)), Field64::from(0));
-        assert_eq!(point.eq_poly(BinaryHypercubePoint(0b10)), Field64::from(1));
-        assert_eq!(point.eq_poly(BinaryHypercubePoint(0b11)), Field64::from(0));
+        let point = MultilinearPoint(vec![Goldilocks::from(1u32), Goldilocks::from(0u32)]);
+        assert_eq!(
+            point.eq_poly(BinaryHypercubePoint(0b00)),
+            Goldilocks::from(0u32)
+        );
+        assert_eq!(
+            point.eq_poly(BinaryHypercubePoint(0b01)),
+            Goldilocks::from(0u32)
+        );
+        assert_eq!(
+            point.eq_poly(BinaryHypercubePoint(0b10)),
+            Goldilocks::from(1u32)
+        );
+        assert_eq!(
+            point.eq_poly(BinaryHypercubePoint(0b11)),
+            Goldilocks::from(0u32)
+        );
     }
 
     #[test]
     #[allow(clippy::cognitive_complexity)]
     fn test_equality3() {
-        let point = MultilinearPoint(vec![Field64::from(0), Field64::from(0)]);
+        let point = MultilinearPoint(vec![Goldilocks::from(0u32), Goldilocks::from(0u32)]);
 
-        assert_eq!(point.eq_poly3(0), Field64::from(1));
-        assert_eq!(point.eq_poly3(1), Field64::from(0));
-        assert_eq!(point.eq_poly3(2), Field64::from(0));
-        assert_eq!(point.eq_poly3(3), Field64::from(0));
-        assert_eq!(point.eq_poly3(4), Field64::from(0));
-        assert_eq!(point.eq_poly3(5), Field64::from(0));
-        assert_eq!(point.eq_poly3(6), Field64::from(0));
-        assert_eq!(point.eq_poly3(7), Field64::from(0));
-        assert_eq!(point.eq_poly3(8), Field64::from(0));
+        assert_eq!(point.eq_poly3(0), Goldilocks::from(1u32));
+        assert_eq!(point.eq_poly3(1), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(2), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(3), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(4), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(5), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(6), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(7), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(8), Goldilocks::from(0u32));
 
-        let point = MultilinearPoint(vec![Field64::from(1), Field64::from(0)]);
+        let point = MultilinearPoint(vec![Goldilocks::from(1u32), Goldilocks::from(0u32)]);
 
-        assert_eq!(point.eq_poly3(0), Field64::from(0));
-        assert_eq!(point.eq_poly3(1), Field64::from(0));
-        assert_eq!(point.eq_poly3(2), Field64::from(0));
-        assert_eq!(point.eq_poly3(3), Field64::from(1)); // 3 corresponds to ternary (1,0)
-        assert_eq!(point.eq_poly3(4), Field64::from(0));
-        assert_eq!(point.eq_poly3(5), Field64::from(0));
-        assert_eq!(point.eq_poly3(6), Field64::from(0));
-        assert_eq!(point.eq_poly3(7), Field64::from(0));
-        assert_eq!(point.eq_poly3(8), Field64::from(0));
+        assert_eq!(point.eq_poly3(0), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(1), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(2), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(3), Goldilocks::from(1u32)); // 3 corresponds to ternary (1,0)
+        assert_eq!(point.eq_poly3(4), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(5), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(6), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(7), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(8), Goldilocks::from(0u32));
 
-        let point = MultilinearPoint(vec![Field64::from(0), Field64::from(2)]);
+        let point = MultilinearPoint(vec![Goldilocks::from(0u32), Goldilocks::from(2u32)]);
 
-        assert_eq!(point.eq_poly3(0), Field64::from(0));
-        assert_eq!(point.eq_poly3(1), Field64::from(0));
-        assert_eq!(point.eq_poly3(2), Field64::from(1)); // 2 corresponds to ternary (0,2)
-        assert_eq!(point.eq_poly3(3), Field64::from(0));
-        assert_eq!(point.eq_poly3(4), Field64::from(0));
-        assert_eq!(point.eq_poly3(5), Field64::from(0));
-        assert_eq!(point.eq_poly3(6), Field64::from(0));
-        assert_eq!(point.eq_poly3(7), Field64::from(0));
-        assert_eq!(point.eq_poly3(8), Field64::from(0));
+        assert_eq!(point.eq_poly3(0), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(1), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(2), Goldilocks::from(1u32)); // 2 corresponds to ternary (0,2)
+        assert_eq!(point.eq_poly3(3), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(4), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(5), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(6), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(7), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(8), Goldilocks::from(0u32));
 
-        let point = MultilinearPoint(vec![Field64::from(2), Field64::from(2)]);
+        let point = MultilinearPoint(vec![Goldilocks::from(2u32), Goldilocks::from(2u32)]);
 
-        assert_eq!(point.eq_poly3(0), Field64::from(0));
-        assert_eq!(point.eq_poly3(1), Field64::from(0));
-        assert_eq!(point.eq_poly3(2), Field64::from(0));
-        assert_eq!(point.eq_poly3(3), Field64::from(0));
-        assert_eq!(point.eq_poly3(4), Field64::from(0));
-        assert_eq!(point.eq_poly3(5), Field64::from(0));
-        assert_eq!(point.eq_poly3(6), Field64::from(0));
-        assert_eq!(point.eq_poly3(7), Field64::from(0));
-        assert_eq!(point.eq_poly3(8), Field64::from(1)); // 8 corresponds to ternary (2,2)
+        assert_eq!(point.eq_poly3(0), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(1), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(2), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(3), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(4), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(5), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(6), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(7), Goldilocks::from(0u32));
+        assert_eq!(point.eq_poly3(8), Goldilocks::from(1u32)); // 8 corresponds to ternary (2,2)
     }
 
     #[test]
@@ -905,7 +963,7 @@ mod tests {
         let mut all_same_count = 0;
 
         for _ in 0..K {
-            let point = MultilinearPoint::<Field64>::rand(&mut rng, N);
+            let point = MultilinearPoint::<Goldilocks>::rand(&mut rng, N);
             let first = point.0[0];
 
             // Check if all coordinates are the same as the first one
