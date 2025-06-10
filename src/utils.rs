@@ -1,19 +1,21 @@
 #[cfg(test)]
 use std::fmt::Debug;
 
-use ark_ff::Field;
-use ark_serialize::CanonicalSerialize;
-#[cfg(test)]
-use serde::{Deserialize, Serialize};
+use arith::Field;
 
-/// Workaround for Ark types that are missing comparisons
-pub fn ark_eq<T: CanonicalSerialize>(a: &T, b: &T) -> bool {
-    let mut buf_a = Vec::new();
-    let mut buf_b = Vec::new();
-    a.serialize_uncompressed(&mut buf_a).unwrap();
-    b.serialize_uncompressed(&mut buf_b).unwrap();
-    buf_a == buf_b
-}
+// use ark_ff::Field;
+// use ark_serialize::CanonicalSerialize;
+// #[cfg(test)]
+// use serde::{Deserialize, Serialize};
+
+// /// Workaround for Ark types that are missing comparisons
+// pub fn ark_eq<T: CanonicalSerialize>(a: &T, b: &T) -> bool {
+//     let mut buf_a = Vec::new();
+//     let mut buf_b = Vec::new();
+//     a.serialize_uncompressed(&mut buf_a).unwrap();
+//     b.serialize_uncompressed(&mut buf_b).unwrap();
+//     buf_a == buf_b
+// }
 
 /// Fuzzy comparison of f64 using absolute error.
 pub fn f64_eq_abs(a: f64, b: f64, abs_err: f64) -> bool {
@@ -119,27 +121,29 @@ pub(crate) fn eval_eq<F: Field>(eval: &[F], out: &mut [F], scalar: F) {
     }
 }
 
-#[cfg(test)]
-#[track_caller]
-pub fn test_serde<T: Debug + PartialEq + Serialize + for<'a> Deserialize<'a>>(value: &T) {
-    // Test in human-readable format
-    let json = serde_json::to_string_pretty(value).expect("json serialization failed");
-    let deserialized = serde_json::from_str(&json).expect("json deserialization failed");
-    assert_eq!(value, &deserialized, "json serde roundtrip failed");
+// #[cfg(test)]
+// #[track_caller]
+// pub fn test_serde<T: Debug + PartialEq + Serialize + for<'a> Deserialize<'a>>(value: &T) {
+//     // Test in human-readable format
+//     let json = serde_json::to_string_pretty(value).expect("json serialization failed");
+//     let deserialized = serde_json::from_str(&json).expect("json deserialization failed");
+//     assert_eq!(value, &deserialized, "json serde roundtrip failed");
 
-    // Test in schemaless binary format
-    let bytes = postcard::to_allocvec(value).expect("postcard serialization failed");
-    let deserialized = postcard::from_bytes(&bytes).expect("postcard deserialization failed");
-    assert_eq!(value, &deserialized, "postcard serde roundtrip failed");
-}
+//     // Test in schemaless binary format
+//     let bytes = postcard::to_allocvec(value).expect("postcard serialization failed");
+//     let deserialized = postcard::from_bytes(&bytes).expect("postcard deserialization failed");
+//     assert_eq!(value, &deserialized, "postcard serde roundtrip failed");
+// }
 
 #[cfg(test)]
 mod tests {
-    use ark_ff::{AdditiveGroup, Field};
+    // use ark_ff::{AdditiveGroup, Field};
+
+    use goldilocks::Goldilocks;
 
     use super::*;
     use crate::{
-        crypto::fields::Field64,
+        // crypto::fields::Goldilocks,
         poly_utils::{
             lagrange_iterator::LagrangePolynomialIterator, multilinear::MultilinearPoint,
         },
@@ -255,12 +259,12 @@ mod tests {
 
     #[test]
     fn test_eval_eq() {
-        let eval = vec![Field64::from(3), Field64::from(5)];
-        let mut out = vec![Field64::ZERO; 4];
-        eval_eq(&eval, &mut out, Field64::ONE);
+        let eval = vec![Goldilocks::from(3u32), Goldilocks::from(5u32)];
+        let mut out = vec![Goldilocks::ZERO; 4];
+        eval_eq(&eval, &mut out, Goldilocks::ONE);
 
         let point = MultilinearPoint(eval);
-        let mut expected = vec![Field64::ZERO; 4];
+        let mut expected = vec![Goldilocks::ZERO; 4];
         for (prefix, lag) in LagrangePolynomialIterator::from(&point) {
             expected[prefix.0] = lag;
         }
@@ -271,15 +275,15 @@ mod tests {
     #[test]
     fn test_expand_randomness_basic() {
         // Test with base = 2 and length = 5
-        let base = Field64::from(2);
+        let base = Goldilocks::from(2u32);
         let len = 5;
 
         let expected = vec![
-            Field64::ONE,
-            Field64::from(2),
-            Field64::from(4),
-            Field64::from(8),
-            Field64::from(16),
+            Goldilocks::ONE,
+            Goldilocks::from(2u32),
+            Goldilocks::from(4u32),
+            Goldilocks::from(8u32),
+            Goldilocks::from(16u32),
         ];
 
         assert_eq!(expand_randomness(base, len), expected);
@@ -288,28 +292,28 @@ mod tests {
     #[test]
     fn test_expand_randomness_zero_length() {
         // If len = 0, should return an empty vector
-        let base = Field64::from(3);
+        let base = Goldilocks::from(3u32);
         assert!(expand_randomness(base, 0).is_empty());
     }
 
     #[test]
     fn test_expand_randomness_one_length() {
         // If len = 1, should return [1]
-        let base = Field64::from(5);
-        assert_eq!(expand_randomness(base, 1), vec![Field64::ONE]);
+        let base = Goldilocks::from(5u32);
+        assert_eq!(expand_randomness(base, 1), vec![Goldilocks::ONE]);
     }
 
     #[test]
     fn test_expand_randomness_large_base() {
         // Test with a large base value
-        let base = Field64::from(10);
+        let base = Goldilocks::from(10u32);
         let len = 4;
 
         let expected = vec![
-            Field64::ONE,
-            Field64::from(10),
-            Field64::from(100),
-            Field64::from(1000),
+            Goldilocks::ONE,
+            Goldilocks::from(10u32),
+            Goldilocks::from(100u32),
+            Goldilocks::from(1000u32),
         ];
 
         assert_eq!(expand_randomness(base, len), expected);
@@ -318,25 +322,25 @@ mod tests {
     #[test]
     fn test_expand_randomness_identity_case() {
         // If base = 1, all values should be 1
-        let base = Field64::ONE;
+        let base = Goldilocks::ONE;
         let len = 6;
 
-        let expected = vec![Field64::ONE; len];
+        let expected = vec![Goldilocks::ONE; len];
         assert_eq!(expand_randomness(base, len), expected);
     }
 
     #[test]
     fn test_expand_randomness_zero_base() {
         // If base = 0, all values after the first should be 0
-        let base = Field64::ZERO;
+        let base = Goldilocks::ZERO;
         let len = 5;
 
         let expected = vec![
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ZERO,
-            Field64::ZERO,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ZERO,
+            Goldilocks::ZERO,
+            Goldilocks::ZERO,
         ];
         assert_eq!(expand_randomness(base, len), expected);
     }
@@ -344,16 +348,16 @@ mod tests {
     #[test]
     fn test_expand_randomness_negative_base() {
         // Test with base = -1, which should alternate between 1 and -1
-        let base = -Field64::ONE;
+        let base = -Goldilocks::ONE;
         let len = 6;
 
         let expected = vec![
-            Field64::ONE,
-            -Field64::ONE,
-            Field64::ONE,
-            -Field64::ONE,
-            Field64::ONE,
-            -Field64::ONE,
+            Goldilocks::ONE,
+            -Goldilocks::ONE,
+            Goldilocks::ONE,
+            -Goldilocks::ONE,
+            Goldilocks::ONE,
+            -Goldilocks::ONE,
         ];
 
         assert_eq!(expand_randomness(base, len), expected);
