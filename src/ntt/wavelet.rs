@@ -1,4 +1,5 @@
-use ark_ff::Field;
+// use ark_ff::Field;
+use arith::Field;
 #[cfg(feature = "parallel")]
 use {super::utils::workload_size, rayon::prelude::*};
 
@@ -129,20 +130,23 @@ pub fn wavelet_transform_batch<F: Field>(values: &mut [F], size: usize) {
 
 #[cfg(test)]
 mod tests {
+    use arith::Field;
+    // use crate::crypto::fields::Field64;
+    use goldilocks::Goldilocks;
+
     use super::*;
-    use crate::crypto::fields::Field64;
 
     #[test]
     fn test_wavelet_transform_single_element() {
-        let mut values = vec![Field64::from(5)];
+        let mut values = vec![Goldilocks::from(5u32)];
         wavelet_transform(&mut values);
-        assert_eq!(values, vec![Field64::from(5)]);
+        assert_eq!(values, vec![Goldilocks::from(5u32)]);
     }
 
     #[test]
     fn test_wavelet_transform_size_2() {
-        let v1 = Field64::from(3);
-        let v2 = Field64::from(7);
+        let v1 = Goldilocks::from(3u32);
+        let v2 = Goldilocks::from(7u32);
         let mut values = vec![v1, v2];
         wavelet_transform(&mut values);
         assert_eq!(values, vec![v1, v1 + v2]);
@@ -150,10 +154,10 @@ mod tests {
 
     #[test]
     fn test_wavelet_transform_size_4() {
-        let v1 = Field64::from(1);
-        let v2 = Field64::from(2);
-        let v3 = Field64::from(3);
-        let v4 = Field64::from(4);
+        let v1 = Goldilocks::from(1u32);
+        let v2 = Goldilocks::from(2u32);
+        let v3 = Goldilocks::from(3u32);
+        let v4 = Goldilocks::from(4u32);
         let mut values = vec![v1, v2, v3, v4];
 
         wavelet_transform(&mut values);
@@ -163,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_wavelet_transform_size_8() {
-        let mut values = (1..=8).map(Field64::from).collect::<Vec<_>>();
+        let mut values = (1u32..=8).map(Goldilocks::from).collect::<Vec<_>>();
         let v1 = values[0];
         let v2 = values[1];
         let v3 = values[2];
@@ -192,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_wavelet_transform_size_16() {
-        let mut values = (1..=16).map(Field64::from).collect::<Vec<_>>();
+        let mut values = (1u32..=16).map(Goldilocks::from).collect::<Vec<_>>();
         let v1 = values[0];
         let v2 = values[1];
         let v3 = values[2];
@@ -252,7 +256,7 @@ mod tests {
     #[test]
     fn test_wavelet_transform_large() {
         let size = 2_i32.pow(10) as u64;
-        let mut values = (1..=size).map(Field64::from).collect::<Vec<_>>();
+        let mut values = (1..=size).map(Goldilocks::from).collect::<Vec<_>>();
         let v1 = values[0];
 
         wavelet_transform(&mut values);
@@ -262,7 +266,7 @@ mod tests {
 
         // Verify last element has accumulated all previous values
         let expected_last = (1..=size).sum::<u64>();
-        assert_eq!(values[size as usize - 1], Field64::from(expected_last));
+        assert_eq!(values[size as usize - 1], Goldilocks::from(expected_last));
     }
 
     #[test]
@@ -272,7 +276,7 @@ mod tests {
         // Ensure values.len() > size to enter parallel execution
         let total_size = batch_size * 4;
         let mut values = (1..=total_size as u64)
-            .map(Field64::from)
+            .map(Goldilocks::from)
             .collect::<Vec<_>>();
 
         // Keep a copy to compare later
@@ -302,14 +306,14 @@ mod tests {
         }
 
         // Ensure the first element remains unchanged
-        assert_eq!(values[0], Field64::from(1));
+        assert_eq!(values[0], Goldilocks::from(1u32));
 
         // Ensure the last element has accumulated all values from its own chunk
         let expected_last_chunk_sum =
             (total_size as u64 - batch_size as u64 + 1..=total_size as u64).sum::<u64>();
         assert_eq!(
             values[total_size - 1],
-            Field64::from(expected_last_chunk_sum),
+            Goldilocks::from(expected_last_chunk_sum),
             "Final element mismatch"
         );
     }

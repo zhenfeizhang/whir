@@ -1,10 +1,10 @@
-use ark_ff::FftField;
+// use ark_ff::FftField;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
 use super::*;
 
-pub(super) fn expand_from_coeff<F: FftField>(coeffs: &[F], expansion: usize) -> Vec<F> {
+pub(super) fn expand_from_coeff<F: FFTField + 'static>(coeffs: &[F], expansion: usize) -> Vec<F> {
     let engine = cooley_tukey::NttEngine::<F>::new_from_cache();
     let expanded_size = coeffs.len() * expansion;
     let mut result = Vec::with_capacity(expanded_size);
@@ -26,13 +26,13 @@ pub(super) fn expand_from_coeff<F: FftField>(coeffs: &[F], expansion: usize) -> 
     }
     #[cfg(feature = "parallel")]
     result.par_extend((1..expansion).into_par_iter().flat_map(|i| {
-        let root_i = root.pow([i as u64]);
+        let root_i = root.exp(i as u128);
         coeffs
             .par_iter()
             .enumerate()
             .map_with(F::ZERO, move |root_j, (j, coeff)| {
                 if root_j.is_zero() {
-                    *root_j = root_i.pow([j as u64]);
+                    *root_j = root_i.exp(j as u128);
                 } else {
                     *root_j *= root_i;
                 }
@@ -68,7 +68,7 @@ pub(super) fn expand_from_coeff<F: FftField>(coeffs: &[F], expansion: usize) -> 
 ///
 /// # Panics
 /// Panics if the input size is not divisible by `2^folding_factor`.
-pub fn transform_evaluations<F: FftField>(
+pub fn transform_evaluations<F: FFTField + 'static>(
     evals: &mut [F],
     domain_gen_inv: F,
     folding_factor: usize,
@@ -90,7 +90,7 @@ pub fn transform_evaluations<F: FftField>(
 
     // Step 3: Apply scaling to match the desired domain layout
     // Each value is scaled by: size_inv * offset^j
-    let size_inv = F::from(folding_factor_exp as u64).inverse().unwrap();
+    let size_inv = F::from(folding_factor_exp as u32).inv().unwrap();
     #[cfg(not(feature = "parallel"))]
     {
         let mut coset_offset_inv = F::ONE;
@@ -109,7 +109,7 @@ pub fn transform_evaluations<F: FftField>(
         .enumerate()
         .for_each_with(F::ZERO, |offset, (i, answers)| {
             if *offset == F::ZERO {
-                *offset = domain_gen_inv.pow([i as u64]);
+                *offset = domain_gen_inv.exp(i as u128);
             } else {
                 *offset *= domain_gen_inv;
             }
