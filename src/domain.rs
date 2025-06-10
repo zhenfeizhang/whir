@@ -8,6 +8,7 @@
 use std::marker::PhantomData;
 
 use arith::FFTField;
+use ark_std::log2;
 use serdes::ExpSerde;
 
 /// Represents an evaluation domain used in FFT-based polynomial arithmetic.
@@ -52,7 +53,9 @@ where
     /// If the domain cannot be constructed, it returns `None`.
     pub fn new(degree: usize, log_rho_inv: usize) -> Option<Self> {
         let size = degree * (1 << log_rho_inv);
-        if size > F::TWO_ADICITY {
+        let log_size = log2(size) as usize;
+
+        if log_size >= F::TWO_ADICITY {
             // If the size exceeds the field's TWO_ADICITY limit, return None.
             return None;
         }
@@ -65,7 +68,7 @@ where
         //     base_domain: Some(base_domain),
         // })
 
-        let generator = F::two_adic_generator(size);
+        let generator = F::two_adic_generator(log_size);
 
         Some(Self {
             generator,

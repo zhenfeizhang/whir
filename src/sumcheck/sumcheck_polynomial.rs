@@ -183,8 +183,10 @@ mod tests {
         let poly = SumcheckPolynomial::new(evaluations, 2);
 
         // Sum over {0,1}^2: f(0,0) + f(0,1) + f(1,0) + f(1,1)
-        let expected_sum =
-            Goldilocks::from(1u32) + Goldilocks::from(2u32) + Goldilocks::from(4u32) + Goldilocks::from(5u32);
+        let expected_sum = Goldilocks::from(1u32)
+            + Goldilocks::from(2u32)
+            + Goldilocks::from(4u32)
+            + Goldilocks::from(5u32);
         let computed_sum = poly.sum_over_boolean_hypercube();
         assert_eq!(computed_sum, expected_sum);
     }

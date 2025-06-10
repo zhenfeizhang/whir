@@ -1,4 +1,5 @@
-use ark_crypto_primitives::merkle_tree::{Config, MerkleTree};
+// use ark_crypto_primitives::merkle_tree::{Config, MerkleTree};
+use tree::Tree;
 
 use crate::poly_utils::coeffs::CoefficientList;
 
@@ -13,14 +14,11 @@ pub use writer::CommitmentWriter;
 /// This structure holds all necessary components to verify a commitment,
 /// including the polynomial itself, the Merkle tree used for commitment,
 /// and out-of-domain (OOD) evaluations.
-pub struct Witness<F, MerkleConfig>
-where
-    MerkleConfig: Config,
-{
+pub struct Witness<F> {
     /// The committed polynomial in coefficient form.
     pub(crate) polynomial: CoefficientList<F>,
     /// The Merkle tree constructed from the polynomial evaluations.
-    pub(crate) merkle_tree: MerkleTree<MerkleConfig>,
+    pub(crate) merkle_tree: Tree,
     /// The leaves of the Merkle tree, derived from folded polynomial evaluations.
     pub(crate) merkle_leaves: Vec<F>,
     /// Out-of-domain challenge points used for polynomial verification.
