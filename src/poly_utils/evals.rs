@@ -188,11 +188,16 @@ mod tests {
     use goldilocks::Goldilocks;
 
     use super::*;
-    use crate::{poly_utils::hypercube::BinaryHypercube};
+    use crate::poly_utils::hypercube::BinaryHypercube;
 
     #[test]
     fn test_new_evaluations_list() {
-        let evals = vec![Goldilocks::ZERO, Goldilocks::ONE, Goldilocks::ZERO, Goldilocks::ONE];
+        let evals = vec![
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+        ];
         let evaluations_list = EvaluationsList::new(evals.clone());
 
         assert_eq!(evaluations_list.num_evals(), evals.len());
@@ -226,7 +231,12 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_index_out_of_bounds() {
-        let evals = vec![Goldilocks::ZERO, Goldilocks::ONE, Goldilocks::ZERO, Goldilocks::ONE];
+        let evals = vec![
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+        ];
         let evaluations_list = EvaluationsList::new(evals);
 
         let _ = evaluations_list[4]; // Index out of range, should panic
@@ -250,7 +260,12 @@ mod tests {
 
     #[test]
     fn test_evaluate_on_hypercube_points() {
-        let evaluations_vec = vec![Goldilocks::ZERO, Goldilocks::ONE, Goldilocks::ZERO, Goldilocks::ONE];
+        let evaluations_vec = vec![
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+        ];
         let evals = EvaluationsList::new(evaluations_vec.clone());
 
         for i in BinaryHypercube::new(2) {
@@ -395,7 +410,7 @@ mod tests {
 
         // Evaluate at `(x, y) = (1/2, 1/2)`
         let x = Goldilocks::INV_2;
-        let y =Goldilocks::INV_2;
+        let y = Goldilocks::INV_2;
 
         // Interpolation formula:
         // f(x, y) = (1-x)(1-y) * f(0,0) + (1-x)y * f(0,1) + x(1-y) * f(1,0) + xy * f(1,1)
@@ -468,23 +483,26 @@ mod tests {
         let w = Goldilocks::from(3u32) * Goldilocks::from(5u32).inv().unwrap();
 
         // Quadlinear interpolation formula
-        let expected =
-            (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * (Goldilocks::ONE - w) * a
-                + (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * w * b
-                + (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * z * (Goldilocks::ONE - w) * c
-                + (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * z * w * d
-                + (Goldilocks::ONE - x) * y * (Goldilocks::ONE - z) * (Goldilocks::ONE - w) * e
-                + (Goldilocks::ONE - x) * y * (Goldilocks::ONE - z) * w * f
-                + (Goldilocks::ONE - x) * y * z * (Goldilocks::ONE - w) * g
-                + (Goldilocks::ONE - x) * y * z * w * h
-                + x * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * (Goldilocks::ONE - w) * i
-                + x * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * w * j
-                + x * (Goldilocks::ONE - y) * z * (Goldilocks::ONE - w) * k
-                + x * (Goldilocks::ONE - y) * z * w * l
-                + x * y * (Goldilocks::ONE - z) * (Goldilocks::ONE - w) * m
-                + x * y * (Goldilocks::ONE - z) * w * n
-                + x * y * z * (Goldilocks::ONE - w) * o
-                + x * y * z * w * p;
+        let expected = (Goldilocks::ONE - x)
+            * (Goldilocks::ONE - y)
+            * (Goldilocks::ONE - z)
+            * (Goldilocks::ONE - w)
+            * a
+            + (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * w * b
+            + (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * z * (Goldilocks::ONE - w) * c
+            + (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * z * w * d
+            + (Goldilocks::ONE - x) * y * (Goldilocks::ONE - z) * (Goldilocks::ONE - w) * e
+            + (Goldilocks::ONE - x) * y * (Goldilocks::ONE - z) * w * f
+            + (Goldilocks::ONE - x) * y * z * (Goldilocks::ONE - w) * g
+            + (Goldilocks::ONE - x) * y * z * w * h
+            + x * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * (Goldilocks::ONE - w) * i
+            + x * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * w * j
+            + x * (Goldilocks::ONE - y) * z * (Goldilocks::ONE - w) * k
+            + x * (Goldilocks::ONE - y) * z * w * l
+            + x * y * (Goldilocks::ONE - z) * (Goldilocks::ONE - w) * m
+            + x * y * (Goldilocks::ONE - z) * w * n
+            + x * y * z * (Goldilocks::ONE - w) * o
+            + x * y * z * w * p;
 
         // Validate against the function output
         assert_eq!(eval_multilinear(&evals, &[x, y, z, w]), expected);

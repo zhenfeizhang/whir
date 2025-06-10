@@ -179,7 +179,11 @@ impl<F: Field> MultilinearPoint<F>
 //     Standard: Distribution<F>,
 {
     pub fn rand(mut rng: &mut impl RngCore, num_variables: usize) -> Self {
-        Self((0..num_variables).map(|_| F::random_unsafe(&mut rng)).collect())
+        Self(
+            (0..num_variables)
+                .map(|_| F::random_unsafe(&mut rng))
+                .collect(),
+        )
     }
 }
 
