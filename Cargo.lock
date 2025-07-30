@@ -1456,6 +1456,7 @@ dependencies = [
  "halo2curves",
  "itertools 0.13.0",
  "rand",
+ "serdes",
 ]
 
 [[package]]
