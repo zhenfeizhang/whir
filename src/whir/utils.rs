@@ -1,11 +1,12 @@
-use ark_crypto_primitives::merkle_tree::Config;
-use ark_ff::FftField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+// use ark_crypto_primitives::merkle_tree::Config;
+// use ark_ff::FftField;
+use arith::FFTField;
+// use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use itertools::Itertools;
-use spongefish::{
-    codecs::arkworks_algebra::{FieldToUnitSerialize, UnitToField},
-    ProofResult, UnitToBytes,
-};
+// use spongefish::{
+//     codecs::arkworks_algebra::{FieldToUnitSerialize, UnitToField},
+//     ProofResult, UnitToBytes,
+// };
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
@@ -22,7 +23,7 @@ pub(crate) fn sample_ood_points<F, ProverState, E>(
     evaluate_fn: E,
 ) -> ProofResult<(Vec<F>, Vec<F>)>
 where
-    F: FftField,
+    F: FFTField,
     ProverState: FieldToUnitSerialize<F> + UnitToField<F>,
     E: Fn(&MultilinearPoint<F>) -> F,
 {

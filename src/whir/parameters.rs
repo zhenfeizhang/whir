@@ -5,27 +5,31 @@ use std::{
     marker::PhantomData,
 };
 
-use ark_crypto_primitives::merkle_tree::{Config, LeafParam, TwoToOneParam};
-use ark_ff::FftField;
-use ark_poly::EvaluationDomain;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use serde::{Deserialize, Serialize};
+// use ark_crypto_primitives::merkle_tree::{Config, LeafParam, TwoToOneParam};
+// use ark_ff::FftField;
+// use ark_poly::EvaluationDomain;
+// use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+// use serde::{Deserialize, Serialize};
+use arith::FFTField;
+use ark_std::log2;
 
 use crate::{
-    crypto::fields::FieldWithSize,
+    // crypto::fields::FieldWithSize,
     domain::Domain,
     parameters::{FoldingFactor, MultivariateParameters, ProtocolParameters, SoundnessType},
-    utils::{ark_eq, f64_eq_abs},
+    // utils::{ark_eq, f64_eq_abs},
+    utils::f64_eq_abs,
 };
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(bound = r#"
-    LeafParam<MerkleConfig>: CanonicalSerialize + CanonicalDeserialize,
-    TwoToOneParam<MerkleConfig>: CanonicalSerialize + CanonicalDeserialize
-"#)]
-pub struct WhirConfig<F, MerkleConfig, PowStrategy>
+// #[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
+// #[serde(bound = r#"
+//     LeafParam<MerkleConfig>: CanonicalSerialize + CanonicalDeserialize,
+//     TwoToOneParam<MerkleConfig>: CanonicalSerialize + CanonicalDeserialize
+// "#)]
+pub struct WhirConfig<F, PowStrategy>
 where
-    F: FftField,
-    MerkleConfig: Config,
+    F: FFTField,
+    // MerkleConfig: Config,
 {
     pub mv_parameters: MultivariateParameters<F>,
     pub soundness_type: SoundnessType,
@@ -54,21 +58,21 @@ where
     pub final_folding_pow_bits: f64,
 
     // PoW parameters
-    #[serde(skip)]
+    // #[serde(skip)]
     pub pow_strategy: PhantomData<PowStrategy>,
-
-    // Merkle tree parameters
-    #[serde(with = "crate::ark_serde")]
-    pub leaf_hash_params: LeafParam<MerkleConfig>,
-    #[serde(with = "crate::ark_serde")]
-    pub two_to_one_params: TwoToOneParam<MerkleConfig>,
+    // // Merkle tree parameters
+    // #[serde(with = "crate::ark_serde")]
+    // pub leaf_hash_params: LeafParam<MerkleConfig>,
+    // #[serde(with = "crate::ark_serde")]
+    // pub two_to_one_params: TwoToOneParam<MerkleConfig>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+// #[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
 pub struct RoundConfig<F>
 where
-    F: FftField,
+    F: FFTField,
 {
     pub pow_bits: f64,
     pub folding_pow_bits: f64,
@@ -78,23 +82,24 @@ where
     pub num_variables: usize,
     pub folding_factor: usize,
     pub domain_size: usize,
-    #[serde(with = "crate::ark_serde")]
+    // #[serde(with = "crate::ark_serde")]
     pub domain_gen: F,
-    #[serde(with = "crate::ark_serde")]
+    // #[serde(with = "crate::ark_serde")]
     pub domain_gen_inv: F,
-    #[serde(with = "crate::ark_serde")]
+    // #[serde(with = "crate::ark_serde")]
     pub exp_domain_gen: F,
 }
 
-impl<F, MerkleConfig, PowStrategy> WhirConfig<F, MerkleConfig, PowStrategy>
+// impl<F, MerkleConfig, PowStrategy> WhirConfig<F, MerkleConfig, PowStrategy>
+impl<F, PowStrategy> WhirConfig<F, PowStrategy>
 where
-    F: FftField + FieldWithSize,
-    MerkleConfig: Config,
+    F: FFTField,
 {
     #[allow(clippy::too_many_lines)]
     pub fn new(
         mv_parameters: MultivariateParameters<F>,
-        whir_parameters: ProtocolParameters<MerkleConfig, PowStrategy>,
+        // whir_parameters: ProtocolParameters<MerkleConfig, PowStrategy>,
+        whir_parameters: ProtocolParameters<PowStrategy>,
     ) -> Self {
         whir_parameters
             .folding_factor
@@ -104,7 +109,7 @@ where
         let protocol_security_level = whir_parameters
             .security_level
             .saturating_sub(whir_parameters.pow_bits);
-        let field_size_bits = F::field_size_in_bits();
+        let field_size_bits = F::FIELD_SIZE; // F::field_size_in_bits();
         let mut log_inv_rate = whir_parameters.starting_log_inv_rate;
         let mut num_variables = mv_parameters.num_variables;
 
@@ -112,9 +117,10 @@ where
             .expect("Should have found an appropriate domain - check Field 2 adicity?");
 
         let mut domain_size = starting_domain.size();
-        let mut domain_gen: F = starting_domain.backing_domain.group_gen();
-        let mut domain_gen_inv = starting_domain.backing_domain.group_gen_inv();
-        let mut exp_domain_gen = domain_gen.pow([1 << whir_parameters.folding_factor.at_round(0)]);
+        let mut domain_gen: F = F::two_adic_generator(log2(domain_size) as usize); //starting_domain.backing_domain.group_gen();
+        let mut domain_gen_inv = domain_gen.inv().unwrap(); //starting_domain.backing_domain.group_gen_inv();
+        let mut exp_domain_gen =
+            domain_gen.exp(1 << whir_parameters.folding_factor.at_round(0) as u128);
 
         let (num_rounds, final_sumcheck_rounds) = whir_parameters
             .folding_factor
@@ -224,7 +230,7 @@ where
             domain_gen = domain_gen.square();
             domain_gen_inv = domain_gen_inv.square();
             exp_domain_gen =
-                domain_gen.pow([1 << whir_parameters.folding_factor.at_round(round + 1)]);
+                domain_gen.exp(1 << whir_parameters.folding_factor.at_round(round + 1) as u128);
         }
 
         let final_queries = Self::queries(
@@ -259,8 +265,8 @@ where
             final_folding_pow_bits,
             pow_strategy: PhantomData,
             final_log_inv_rate: log_inv_rate,
-            leaf_hash_params: whir_parameters.leaf_hash_params,
-            two_to_one_params: whir_parameters.two_to_one_params,
+            // leaf_hash_params: whir_parameters.leaf_hash_params,
+            // two_to_one_params: whir_parameters.two_to_one_params,
         }
     }
 
@@ -479,6 +485,10 @@ where
     /// ensuring consistent challenge selection and STIR constraint handling.
     pub fn final_round_config(&self) -> RoundConfig<F> {
         if self.round_parameters.is_empty() {
+            let gen = F::two_adic_generator(log2(self.starting_domain.size()) as usize);
+            let gen_inv = gen.inv().unwrap();
+            let exp_domain_gen = gen.exp(1 << self.folding_factor.at_round(0) as u128);
+
             // Fallback: no folding rounds, use initial domain setup
             RoundConfig {
                 num_variables: self.mv_parameters.num_variables - self.folding_factor.at_round(0),
@@ -486,13 +496,14 @@ where
                 num_queries: self.final_queries,
                 pow_bits: self.final_pow_bits,
                 domain_size: self.starting_domain.size(),
-                domain_gen: self.starting_domain.backing_domain.group_gen(),
-                domain_gen_inv: self.starting_domain.backing_domain.group_gen_inv(),
-                exp_domain_gen: self
-                    .starting_domain
-                    .backing_domain
-                    .group_gen()
-                    .pow([1 << self.folding_factor.at_round(0)]),
+                domain_gen: gen, //self.starting_domain.backing_domain.group_gen(),
+                domain_gen_inv: gen_inv, //self.starting_domain.backing_domain.group_gen_inv(),
+                exp_domain_gen: exp_domain_gen,
+                // self
+                //     .starting_domain
+                //     .backing_domain
+                //     .group_gen()
+                //     .pow([1 << self.folding_factor.at_round(0)]),
                 ood_samples: 0, // no OOD in synthetic final phase
                 folding_pow_bits: self.final_folding_pow_bits,
                 log_inv_rate: self.starting_log_inv_rate,
@@ -511,7 +522,7 @@ where
                 exp_domain_gen: last
                     .domain_gen
                     .square()
-                    .pow([1 << self.folding_factor.at_round(self.n_rounds())]),
+                    .exp(1 << self.folding_factor.at_round(self.n_rounds()) as u32),
                 ood_samples: last.ood_samples,
                 folding_pow_bits: self.final_folding_pow_bits,
                 log_inv_rate: last.log_inv_rate,
@@ -521,10 +532,10 @@ where
 }
 
 /// Manual implementation to allow error in `f64` and handle ark types missing `PartialEq`.
-impl<F, MerkleConfig, PowStrategy> PartialEq for WhirConfig<F, MerkleConfig, PowStrategy>
+impl<F, PowStrategy> PartialEq for WhirConfig<F, PowStrategy>
+// impl<F, MerkleConfig, PowStrategy> PartialEq for WhirConfig<F, MerkleConfig, PowStrategy>
 where
-    F: FftField,
-    MerkleConfig: Config,
+    F: FFTField,
 {
     fn eq(&self, other: &Self) -> bool {
         self.mv_parameters == other.mv_parameters
@@ -546,8 +557,8 @@ where
                 0.001,
             )
             && self.committment_ood_samples == other.committment_ood_samples
-            && ark_eq(&self.leaf_hash_params, &other.leaf_hash_params)
-            && ark_eq(&self.two_to_one_params, &other.two_to_one_params)
+            // && ark_eq(&self.leaf_hash_params, &other.leaf_hash_params)
+            // && ark_eq(&self.two_to_one_params, &other.two_to_one_params)
             && self.folding_factor == other.folding_factor
             && self.initial_statement == other.initial_statement
     }
@@ -555,7 +566,7 @@ where
 
 impl<F> PartialEq for RoundConfig<F>
 where
-    F: FftField,
+    F: FFTField,
 {
     fn eq(&self, other: &Self) -> bool {
         f64_eq_abs(self.pow_bits, other.pow_bits, 0.001)
@@ -568,12 +579,13 @@ where
 
 /// Workaround for `PowStrategy` not implementing `Debug`.
 /// TODO: Add Debug in spongefish (and other common traits).
-impl<F, MerkleConfig, PowStrategy> Debug for WhirConfig<F, MerkleConfig, PowStrategy>
+impl<F, PowStrategy> Debug for WhirConfig<F, PowStrategy>
+// impl<F, MerkleConfig, PowStrategy> Debug for WhirConfig<F, MerkleConfig, PowStrategy>
 where
-    F: FftField,
-    MerkleConfig: Config,
-    LeafParam<MerkleConfig>: Debug,
-    TwoToOneParam<MerkleConfig>: Debug,
+    F: FFTField,
+    // MerkleConfig: Config,
+    // LeafParam<MerkleConfig>: Debug,
+    // TwoToOneParam<MerkleConfig>: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WhirConfig")
@@ -593,16 +605,17 @@ where
             .field("final_sumcheck_rounds", &self.final_sumcheck_rounds)
             .field("final_folding_pow_bits", &self.final_folding_pow_bits)
             .field("folding_factor", &self.folding_factor)
-            .field("leaf_hash_params", &self.leaf_hash_params)
-            .field("two_to_one_params", &self.two_to_one_params)
+            // .field("leaf_hash_params", &self.leaf_hash_params)
+            // .field("two_to_one_params", &self.two_to_one_params)
             .finish()
     }
 }
 
-impl<F, MerkleConfig, PowStrategy> Display for WhirConfig<F, MerkleConfig, PowStrategy>
+impl<F, PowStrategy> Display for WhirConfig<F, PowStrategy>
+// impl<F, MerkleConfig, PowStrategy> Display for WhirConfig<F, MerkleConfig, PowStrategy>
 where
-    F: FftField,
-    MerkleConfig: Config,
+    F: FFTField,
+    // MerkleConfig: Config,
 {
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -636,7 +649,7 @@ where
         writeln!(f, "Round by round soundness analysis:")?;
         writeln!(f, "------------------------------------")?;
 
-        let field_size_bits = F::field_size_in_bits();
+        let field_size_bits = F::FIELD_SIZE; //F::field_size_in_bits();
         let log_eta = Self::log_eta(self.soundness_type, self.starting_log_inv_rate);
         let mut num_variables = self.mv_parameters.num_variables;
 
@@ -778,7 +791,7 @@ where
 
 impl<F> Display for RoundConfig<F>
 where
-    F: FftField,
+    F: FFTField,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
@@ -796,32 +809,33 @@ where
 #[cfg(test)]
 mod tests {
     use ark_std::test_rng;
+    use goldilocks::Goldilocks;
 
     use super::*;
-    use crate::{
-        crypto::{
-            fields::{Field256, Field64},
-            merkle_tree::{
-                keccak::{KeccakCompress, KeccakLeafHash, KeccakMerkleTreeParams},
-                parameters::default_config,
-            },
-        },
-        utils::test_serde,
-    };
+    // use crate::{
+    //     crypto::{
+    //         fields::{Field256, Goldilocks},
+    //         merkle_tree::{
+    //             keccak::{KeccakCompress, KeccakLeafHash, KeccakMerkleTreeParams},
+    //             parameters::default_config,
+    //         },
+    //     },
+    //     utils::test_serde,
+    // };
 
     /// Generates default WHIR parameters
-    fn default_whir_params<F: FftField>() -> ProtocolParameters<KeccakMerkleTreeParams<F>, u8> {
-        let mut rng = test_rng();
-        let (leaf_hash_params, two_to_one_params) =
-            default_config::<F, KeccakLeafHash<F>, KeccakCompress>(&mut rng);
+    fn default_whir_params<F: FFTField>() -> ProtocolParameters<u8> {
+        // let mut rng = test_rng();
+        // let (leaf_hash_params, two_to_one_params) =
+        //     default_config::<F, KeccakCompress>(&mut rng);
 
         ProtocolParameters {
             initial_statement: true,
             security_level: 100,
             pow_bits: 20,
             folding_factor: FoldingFactor::ConstantFromSecondRound(4, 4),
-            leaf_hash_params,
-            two_to_one_params,
+            // leaf_hash_params,
+            // two_to_one_params,
             soundness_type: SoundnessType::ConjectureList,
             _pow_parameters: Default::default(),
             starting_log_inv_rate: 1,
@@ -830,12 +844,12 @@ mod tests {
 
     #[test]
     fn test_whir_config_creation() {
-        type MerkleConfig = KeccakMerkleTreeParams<Field64>;
+        // type MerkleConfig = KeccakMerkleTreeParams<Goldilocks>;
 
-        let params = default_whir_params::<Field64>();
+        let params = default_whir_params::<Goldilocks>();
 
-        let mv_params = MultivariateParameters::<Field64>::new(10);
-        let config = WhirConfig::<Field64, MerkleConfig, u8>::new(mv_params, params);
+        let mv_params = MultivariateParameters::<Goldilocks>::new(10);
+        let config = WhirConfig::<Goldilocks, u8>::new(mv_params, params);
 
         assert_eq!(config.security_level, 100);
         assert_eq!(config.max_pow_bits, 20);
@@ -843,31 +857,31 @@ mod tests {
         assert!(config.initial_statement);
     }
 
-    #[test]
-    fn test_whir_params_serde() {
-        test_serde(&default_whir_params::<Field64>());
-        test_serde(&default_whir_params::<Field256>());
-    }
+    // #[test]
+    // fn test_whir_params_serde() {
+    //     test_serde(&default_whir_params::<Goldilocks>());
+    //     test_serde(&default_whir_params::<Field256>());
+    // }
 
-    #[test]
-    fn test_whir_config_serde() {
-        type MerkleConfig = KeccakMerkleTreeParams<Field64>;
+    // #[test]
+    // fn test_whir_config_serde() {
+    //     type MerkleConfig = KeccakMerkleTreeParams<Goldilocks>;
 
-        let params = default_whir_params::<Field64>();
+    //     let params = default_whir_params::<Goldilocks>();
 
-        let mv_params = MultivariateParameters::<Field64>::new(10);
-        let config = WhirConfig::<Field64, MerkleConfig, u8>::new(mv_params, params);
+    //     let mv_params = MultivariateParameters::<Goldilocks>::new(10);
+    //     let config = WhirConfig::<Goldilocks, MerkleConfig, u8>::new(mv_params, params);
 
-        test_serde(&config);
-    }
+    //     test_serde(&config);
+    // }
 
     #[test]
     fn test_n_rounds() {
-        type MerkleConfig = KeccakMerkleTreeParams<Field64>;
+        // type MerkleConfig = KeccakMerkleTreeParams<Goldilocks>;
 
-        let params = default_whir_params::<Field64>();
-        let mv_params = MultivariateParameters::<Field64>::new(10);
-        let config = WhirConfig::<Field64, MerkleConfig, u8>::new(mv_params, params);
+        let params = default_whir_params::<Goldilocks>();
+        let mv_params = MultivariateParameters::<Goldilocks>::new(10);
+        let config = WhirConfig::<Goldilocks, u8>::new(mv_params, params);
 
         assert_eq!(config.n_rounds(), config.round_parameters.len());
     }
@@ -877,7 +891,7 @@ mod tests {
         let field_size_bits = 64;
         let soundness = SoundnessType::ConjectureList;
 
-        let pow_bits = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::folding_pow_bits(
+        let pow_bits = WhirConfig::<Goldilocks, u8>::folding_pow_bits(
             100, // Security level
             soundness,
             field_size_bits,
@@ -895,7 +909,7 @@ mod tests {
         let security_level = 100;
         let log_inv_rate = 5;
 
-        let result = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::queries(
+        let result = WhirConfig::<Goldilocks, u8>::queries(
             SoundnessType::UniqueDecoding,
             security_level,
             log_inv_rate,
@@ -909,7 +923,7 @@ mod tests {
         let security_level = 128;
         let log_inv_rate = 8;
 
-        let result = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::queries(
+        let result = WhirConfig::<Goldilocks, u8>::queries(
             SoundnessType::ProvableList,
             security_level,
             log_inv_rate,
@@ -923,7 +937,7 @@ mod tests {
         let security_level = 256;
         let log_inv_rate = 16;
 
-        let result = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::queries(
+        let result = WhirConfig::<Goldilocks, u8>::queries(
             SoundnessType::ConjectureList,
             security_level,
             log_inv_rate,
@@ -937,7 +951,7 @@ mod tests {
         let log_inv_rate = 5; // log_inv_rate = 5
         let num_queries = 10; // Number of queries
 
-        let result = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::rbr_queries(
+        let result = WhirConfig::<Goldilocks, u8>::rbr_queries(
             SoundnessType::UniqueDecoding,
             log_inv_rate,
             num_queries,
@@ -951,7 +965,7 @@ mod tests {
         let log_inv_rate = 8; // log_inv_rate = 8
         let num_queries = 16; // Number of queries
 
-        let result = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::rbr_queries(
+        let result = WhirConfig::<Goldilocks, u8>::rbr_queries(
             SoundnessType::ProvableList,
             log_inv_rate,
             num_queries,
@@ -965,7 +979,7 @@ mod tests {
         let log_inv_rate = 4; // log_inv_rate = 4
         let num_queries = 20; // Number of queries
 
-        let result = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::rbr_queries(
+        let result = WhirConfig::<Goldilocks, u8>::rbr_queries(
             SoundnessType::ConjectureList,
             log_inv_rate,
             num_queries,
@@ -976,11 +990,9 @@ mod tests {
 
     #[test]
     fn test_check_pow_bits_within_limits() {
-        type MerkleConfig = KeccakMerkleTreeParams<Field64>;
-
-        let params = default_whir_params::<Field64>();
-        let mv_params = MultivariateParameters::<Field64>::new(10);
-        let mut config = WhirConfig::<Field64, MerkleConfig, u8>::new(mv_params, params);
+        let params = default_whir_params::<Goldilocks>();
+        let mv_params = MultivariateParameters::<Goldilocks>::new(10);
+        let mut config = WhirConfig::<Goldilocks, u8>::new(mv_params, params);
 
         // Set all values within limits
         config.max_pow_bits = 20;
@@ -999,9 +1011,9 @@ mod tests {
                 num_variables: 10,
                 folding_factor: 2,
                 domain_size: 10,
-                domain_gen: Field64::from(2),
-                domain_gen_inv: Field64::from(2),
-                exp_domain_gen: Field64::from(2),
+                domain_gen: Goldilocks::from(2u32),
+                domain_gen_inv: Goldilocks::from(2u32),
+                exp_domain_gen: Goldilocks::from(2u32),
             },
             RoundConfig {
                 pow_bits: 18.0,
@@ -1012,9 +1024,9 @@ mod tests {
                 num_variables: 10,
                 folding_factor: 2,
                 domain_size: 10,
-                domain_gen: Field64::from(2),
-                domain_gen_inv: Field64::from(2),
-                exp_domain_gen: Field64::from(2),
+                domain_gen: Goldilocks::from(2u32),
+                domain_gen_inv: Goldilocks::from(2u32),
+                exp_domain_gen: Goldilocks::from(2u32),
             },
         ];
 
@@ -1026,11 +1038,9 @@ mod tests {
 
     #[test]
     fn test_check_pow_bits_starting_folding_exceeds() {
-        type MerkleConfig = KeccakMerkleTreeParams<Field64>;
-
-        let params = default_whir_params::<Field64>();
-        let mv_params = MultivariateParameters::<Field64>::new(10);
-        let mut config = WhirConfig::<Field64, MerkleConfig, u8>::new(mv_params, params);
+        let params = default_whir_params::<Goldilocks>();
+        let mv_params = MultivariateParameters::<Goldilocks>::new(10);
+        let mut config = WhirConfig::<Goldilocks, u8>::new(mv_params, params);
 
         config.max_pow_bits = 20;
         config.starting_folding_pow_bits = 21.0; // Exceeds max_pow_bits
@@ -1045,11 +1055,9 @@ mod tests {
 
     #[test]
     fn test_check_pow_bits_final_pow_exceeds() {
-        type MerkleConfig = KeccakMerkleTreeParams<Field64>;
-
-        let params = default_whir_params::<Field64>();
-        let mv_params = MultivariateParameters::<Field64>::new(10);
-        let mut config = WhirConfig::<Field64, MerkleConfig, u8>::new(mv_params, params);
+        let params = default_whir_params::<Goldilocks>();
+        let mv_params = MultivariateParameters::<Goldilocks>::new(10);
+        let mut config = WhirConfig::<Goldilocks, u8>::new(mv_params, params);
 
         config.max_pow_bits = 20;
         config.starting_folding_pow_bits = 15.0;
@@ -1064,11 +1072,9 @@ mod tests {
 
     #[test]
     fn test_check_pow_bits_round_pow_exceeds() {
-        type MerkleConfig = KeccakMerkleTreeParams<Field64>;
-
-        let params = default_whir_params::<Field64>();
-        let mv_params = MultivariateParameters::<Field64>::new(10);
-        let mut config = WhirConfig::<Field64, MerkleConfig, u8>::new(mv_params, params);
+        let params = default_whir_params::<Goldilocks>();
+        let mv_params = MultivariateParameters::<Goldilocks>::new(10);
+        let mut config = WhirConfig::<Goldilocks, u8>::new(mv_params, params);
 
         config.max_pow_bits = 20;
         config.starting_folding_pow_bits = 15.0;
@@ -1085,9 +1091,9 @@ mod tests {
             num_variables: 10,
             folding_factor: 2,
             domain_size: 10,
-            domain_gen: Field64::from(2),
-            domain_gen_inv: Field64::from(2),
-            exp_domain_gen: Field64::from(2),
+            domain_gen: Goldilocks::from(2u32),
+            domain_gen_inv: Goldilocks::from(2u32),
+            exp_domain_gen: Goldilocks::from(2u32),
         }];
 
         assert!(
@@ -1098,11 +1104,9 @@ mod tests {
 
     #[test]
     fn test_check_pow_bits_round_folding_pow_exceeds() {
-        type MerkleConfig = KeccakMerkleTreeParams<Field64>;
-
-        let params = default_whir_params::<Field64>();
-        let mv_params = MultivariateParameters::<Field64>::new(10);
-        let mut config = WhirConfig::<Field64, MerkleConfig, u8>::new(mv_params, params);
+        let params = default_whir_params::<Goldilocks>();
+        let mv_params = MultivariateParameters::<Goldilocks>::new(10);
+        let mut config = WhirConfig::<Goldilocks, u8>::new(mv_params, params);
 
         config.max_pow_bits = 20;
         config.starting_folding_pow_bits = 15.0;
@@ -1119,9 +1123,9 @@ mod tests {
             num_variables: 10,
             folding_factor: 2,
             domain_size: 10,
-            domain_gen: Field64::from(2),
-            domain_gen_inv: Field64::from(2),
-            exp_domain_gen: Field64::from(2),
+            domain_gen: Goldilocks::from(2u32),
+            domain_gen_inv: Goldilocks::from(2u32),
+            exp_domain_gen: Goldilocks::from(2u32),
         }];
 
         assert!(
@@ -1132,11 +1136,9 @@ mod tests {
 
     #[test]
     fn test_check_pow_bits_exactly_at_limit() {
-        type MerkleConfig = KeccakMerkleTreeParams<Field64>;
-
-        let params = default_whir_params::<Field64>();
-        let mv_params = MultivariateParameters::<Field64>::new(10);
-        let mut config = WhirConfig::<Field64, MerkleConfig, u8>::new(mv_params, params);
+        let params = default_whir_params::<Goldilocks>();
+        let mv_params = MultivariateParameters::<Goldilocks>::new(10);
+        let mut config = WhirConfig::<Goldilocks, u8>::new(mv_params, params);
 
         config.max_pow_bits = 20;
         config.starting_folding_pow_bits = 20.0;
@@ -1152,9 +1154,9 @@ mod tests {
             num_variables: 10,
             folding_factor: 2,
             domain_size: 10,
-            domain_gen: Field64::from(2),
-            domain_gen_inv: Field64::from(2),
-            exp_domain_gen: Field64::from(2),
+            domain_gen: Goldilocks::from(2u32),
+            domain_gen_inv: Goldilocks::from(2u32),
+            exp_domain_gen: Goldilocks::from(2u32),
         }];
 
         assert!(
@@ -1165,11 +1167,9 @@ mod tests {
 
     #[test]
     fn test_check_pow_bits_all_exceed() {
-        type MerkleConfig = KeccakMerkleTreeParams<Field64>;
-
-        let params = default_whir_params::<Field64>();
-        let mv_params = MultivariateParameters::<Field64>::new(10);
-        let mut config = WhirConfig::<Field64, MerkleConfig, u8>::new(mv_params, params);
+        let params = default_whir_params::<Goldilocks>();
+        let mv_params = MultivariateParameters::<Goldilocks>::new(10);
+        let mut config = WhirConfig::<Goldilocks, u8>::new(mv_params, params);
 
         config.max_pow_bits = 20;
         config.starting_folding_pow_bits = 22.0;
@@ -1185,9 +1185,9 @@ mod tests {
             num_variables: 10,
             folding_factor: 2,
             domain_size: 10,
-            domain_gen: Field64::from(2),
-            domain_gen_inv: Field64::from(2),
-            exp_domain_gen: Field64::from(2),
+            domain_gen: Goldilocks::from(2u32),
+            domain_gen_inv: Goldilocks::from(2u32),
+            exp_domain_gen: Goldilocks::from(2u32),
         }];
 
         assert!(
@@ -1209,7 +1209,7 @@ mod tests {
         ];
 
         for (num_variables, log_inv_rate, log_eta, expected) in cases {
-            let result = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::list_size_bits(
+            let result = WhirConfig::<Goldilocks, u8>::list_size_bits(
                 SoundnessType::ConjectureList,
                 num_variables,
                 log_inv_rate,
@@ -1235,7 +1235,7 @@ mod tests {
         ];
 
         for (num_variables, log_inv_rate, log_eta, expected) in cases {
-            let result = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::list_size_bits(
+            let result = WhirConfig::<Goldilocks, u8>::list_size_bits(
                 SoundnessType::ProvableList,
                 num_variables,
                 log_inv_rate,
@@ -1262,7 +1262,7 @@ mod tests {
         ];
 
         for (num_variables, log_inv_rate, log_eta) in cases {
-            let result = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::list_size_bits(
+            let result = WhirConfig::<Goldilocks, u8>::list_size_bits(
                 SoundnessType::UniqueDecoding,
                 num_variables,
                 log_inv_rate,
@@ -1325,7 +1325,7 @@ mod tests {
 
         for (num_variables, log_inv_rate, log_eta, field_size_bits, ood_samples, expected) in cases
         {
-            let result = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::rbr_ood_sample(
+            let result = WhirConfig::<Goldilocks, u8>::rbr_ood_sample(
                 SoundnessType::ConjectureList,
                 num_variables,
                 log_inv_rate,
@@ -1388,7 +1388,7 @@ mod tests {
 
         for (num_variables, log_inv_rate, log_eta, field_size_bits, ood_samples, expected) in cases
         {
-            let result = WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::rbr_ood_sample(
+            let result = WhirConfig::<Goldilocks, u8>::rbr_ood_sample(
                 SoundnessType::ProvableList,
                 num_variables,
                 log_inv_rate,
@@ -1414,7 +1414,7 @@ mod tests {
     fn test_ood_samples_unique_decoding() {
         // UniqueDecoding should always return 0 regardless of parameters
         assert_eq!(
-            WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::ood_samples(
+            WhirConfig::<Goldilocks, u8>::ood_samples(
                 100,
                 SoundnessType::UniqueDecoding,
                 10,
@@ -1430,7 +1430,7 @@ mod tests {
     fn test_ood_samples_valid_case() {
         // Testing a valid case where the function finds an appropriate `ood_samples`
         assert_eq!(
-            WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::ood_samples(
+            WhirConfig::<Goldilocks, u8>::ood_samples(
                 50, // security level
                 SoundnessType::ProvableList,
                 15,  // num_variables
@@ -1446,7 +1446,7 @@ mod tests {
     fn test_ood_samples_low_security_level() {
         // Lower security level should require fewer OOD samples
         assert_eq!(
-            WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::ood_samples(
+            WhirConfig::<Goldilocks, u8>::ood_samples(
                 30, // Lower security level
                 SoundnessType::ConjectureList,
                 20,  // num_variables
@@ -1462,7 +1462,7 @@ mod tests {
     fn test_ood_samples_high_security_level() {
         // Higher security level should require more OOD samples
         assert_eq!(
-            WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::ood_samples(
+            WhirConfig::<Goldilocks, u8>::ood_samples(
                 100, // High security level
                 SoundnessType::ProvableList,
                 25,   // num_variables
@@ -1477,7 +1477,7 @@ mod tests {
     #[test]
     fn test_ood_extremely_high_security_level() {
         assert_eq!(
-            WhirConfig::<Field64, KeccakMerkleTreeParams<Field64>, u8>::ood_samples(
+            WhirConfig::<Goldilocks, u8>::ood_samples(
                 1000, // Extremely high security level
                 SoundnessType::ConjectureList,
                 10,  // num_variables

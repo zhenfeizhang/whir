@@ -1,4 +1,5 @@
-use ark_ff::Field;
+use arith::{ExtensionField, Field};
+// use ark_ff::Field;
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 #[cfg(feature = "parallel")]
@@ -57,7 +58,7 @@ where
     /// Evaluate self at `point`, where `point` is from a field extension extending the field over which the polynomial `self` is defined.
     ///
     /// Note that we only support the case where F is a prime field.
-    pub fn evaluate_at_extension<E: Field<BasePrimeField = F>>(
+    pub fn evaluate_at_extension<E: ExtensionField<BaseField = F>>(
         &self,
         point: &MultilinearPoint<E>,
     ) -> E {
@@ -146,13 +147,8 @@ impl<F> CoefficientList<F> {
     ///
     /// Note that this is currently restricted to the case where F is a prime field.
     #[cfg_attr(feature = "tracing", instrument(skip_all, fields(size = self.coeffs.len())))]
-    pub fn to_extension<E: Field<BasePrimeField = F>>(self) -> CoefficientList<E> {
-        CoefficientList::new(
-            self.coeffs
-                .into_iter()
-                .map(E::from_base_prime_field)
-                .collect(),
-        )
+    pub fn to_extension<E: ExtensionField<BaseField = F>>(self) -> CoefficientList<E> {
+        CoefficientList::new(self.coeffs.into_iter().map(E::from).collect())
     }
 }
 
@@ -252,7 +248,11 @@ where
 /// - Uses divide-and-conquer recursion:
 ///   - Splits `coeffs` into two halves for `X_0 = 0` and `X_0 = 1`.
 ///   - Recursively evaluates each half.
-fn eval_extension<F: Field, E: Field<BasePrimeField = F>>(coeff: &[F], eval: &[E], scalar: E) -> E {
+fn eval_extension<F: Field, E: ExtensionField<BaseField = F>>(
+    coeff: &[F],
+    eval: &[E],
+    scalar: E,
+) -> E {
     debug_assert_eq!(coeff.len(), 1 << eval.len());
 
     if let Some((&x, tail)) = eval.split_first() {
@@ -273,23 +273,29 @@ fn eval_extension<F: Field, E: Field<BasePrimeField = F>>(coeff: &[F], eval: &[E
         // Default non-parallel execution
         eval_extension(low, tail, scalar) + eval_extension(high, tail, scalar * x)
     } else {
-        scalar.mul_by_base_prime_field(&coeff[0])
+        scalar.mul_by_base_field(&coeff[0])
     }
 }
 
 #[cfg(test)]
 mod tests {
     use ark_ff::AdditiveGroup;
+    use goldilocks::{Goldilocks, GoldilocksExt2};
 
     use super::*;
-    use crate::crypto::fields::{Field64, Field64_2};
+    // use crate::crypto::fields::{Field64, Field64_2};
 
-    type F = Field64;
-    type E = Field64_2;
+    type F = Goldilocks;
+    type E = GoldilocksExt2;
 
     #[test]
     fn test_evaluation_conversion() {
-        let coeffs = vec![F::from(22), F::from(5), F::from(10), F::from(97)];
+        let coeffs = vec![
+            F::from(22u32),
+            F::from(5u32),
+            F::from(10u32),
+            F::from(97u32),
+        ];
         let coeffs_list = CoefficientList::new(coeffs.clone());
 
         let evaluations = EvaluationsList::from(coeffs_list);
@@ -305,11 +311,16 @@ mod tests {
 
     #[test]
     fn test_folding() {
-        let coeffs = vec![F::from(22), F::from(5), F::from(00), F::from(00)];
+        let coeffs = vec![
+            F::from(22u32),
+            F::from(5u32),
+            F::from(00u32),
+            F::from(00u32),
+        ];
         let coeffs_list = CoefficientList::new(coeffs);
 
-        let alpha = F::from(100);
-        let beta = F::from(32);
+        let alpha = F::from(100u32);
+        let beta = F::from(32u32);
 
         let folded = coeffs_list.fold(&MultilinearPoint(vec![beta]));
 
@@ -322,7 +333,7 @@ mod tests {
     #[test]
     fn test_folding_and_evaluation() {
         let num_variables = 10;
-        let coeffs = (0..(1 << num_variables)).map(F::from).collect();
+        let coeffs = (0u32..(1 << num_variables)).map(F::from).collect();
         let coeffs_list = CoefficientList::new(coeffs);
 
         let randomness: Vec<_> = (0..num_variables).map(|i| F::from(35 * i as u64)).collect();
@@ -343,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_coefficient_list_initialization() {
-        let coeffs = vec![F::from(3), F::from(1), F::from(4), F::from(1)];
+        let coeffs = vec![F::from(3u32), F::from(1u32), F::from(4u32), F::from(1u32)];
         let coeff_list = CoefficientList::new(coeffs.clone());
 
         // Check that the coefficients are stored correctly
@@ -354,16 +365,16 @@ mod tests {
 
     #[test]
     fn test_evaluate_multilinear() {
-        let coeff0 = F::from(8);
-        let coeff1 = F::from(2);
-        let coeff2 = F::from(3);
-        let coeff3 = F::from(1);
+        let coeff0 = F::from(8u32);
+        let coeff1 = F::from(2u32);
+        let coeff2 = F::from(3u32);
+        let coeff3 = F::from(1u32);
 
         let coeffs = vec![coeff0, coeff1, coeff2, coeff3];
         let coeff_list = CoefficientList::new(coeffs);
 
-        let x0 = F::from(2);
-        let x1 = F::from(3);
+        let x0 = F::from(2u32);
+        let x1 = F::from(3u32);
         let point = MultilinearPoint(vec![x0, x1]);
 
         // Expected value based on multilinear evaluation
@@ -374,16 +385,16 @@ mod tests {
     #[test]
     fn test_folding_multiple_variables() {
         let num_variables = 3;
-        let coeffs: Vec<F> = (0..(1 << num_variables)).map(F::from).collect();
+        let coeffs: Vec<F> = (0u32..(1 << num_variables)).map(F::from).collect();
         let coeff_list = CoefficientList::new(coeffs);
 
-        let fold_x1 = F::from(4);
-        let fold_x2 = F::from(2);
+        let fold_x1 = F::from(4u32);
+        let fold_x2 = F::from(2u32);
         let folding_point = MultilinearPoint(vec![fold_x1, fold_x2]);
 
         let folded = coeff_list.fold(&folding_point);
 
-        let eval_x0 = F::from(6);
+        let eval_x0 = F::from(6u32);
         let full_point = MultilinearPoint(vec![eval_x0, fold_x1, fold_x2]);
         let expected_eval = coeff_list.evaluate(&full_point);
 
@@ -396,10 +407,10 @@ mod tests {
 
     #[test]
     fn test_coefficient_to_evaluations_conversion() {
-        let coeff0 = F::from(5);
-        let coeff1 = F::from(3);
-        let coeff2 = F::from(7);
-        let coeff3 = F::from(2);
+        let coeff0 = F::from(5u32);
+        let coeff1 = F::from(3u32);
+        let coeff2 = F::from(7u32);
+        let coeff3 = F::from(2u32);
 
         let coeffs = vec![coeff0, coeff1, coeff2, coeff3];
         let coeff_list = CoefficientList::new(coeffs);
@@ -416,7 +427,7 @@ mod tests {
     #[test]
     fn test_num_variables_and_coeffs() {
         // 8 = 2^3, so num_variables = 3
-        let coeffs = vec![F::from(1); 8];
+        let coeffs = vec![F::from(1u32); 8];
         let coeff_list = CoefficientList::new(coeffs);
 
         assert_eq!(coeff_list.num_variables(), 3);
@@ -433,19 +444,19 @@ mod tests {
     #[should_panic]
     fn test_coefficient_list_invalid_size() {
         // 7 is not a power of two
-        let _coeff_list = CoefficientList::new(vec![F::from(1); 7]);
+        let _coeff_list = CoefficientList::new(vec![F::from(1u32); 7]);
     }
 
     #[test]
     fn test_evaluate_at_extension_single_variable() {
         // Polynomial f(X) = 3 + 7X in base field
-        let coeff0 = F::from(3);
-        let coeff1 = F::from(7);
+        let coeff0 = F::from(3u32);
+        let coeff1 = F::from(7u32);
         let coeffs = vec![coeff0, coeff1];
         let coeff_list = CoefficientList::new(coeffs);
 
-        let x = E::from(2); // Evaluation at x = 2 in extension field
-        let expected_value = E::from(3) + E::from(7) * x; // f(2) = 3 + 7 * 2
+        let x = E::from(2u32); // Evaluation at x = 2 in extension field
+        let expected_value = E::from(3u32) + E::from(7u32) * x; // f(2) = 3 + 7 * 2
         let eval_result = coeff_list.evaluate_at_extension(&MultilinearPoint(vec![x]));
 
         assert_eq!(eval_result, expected_value);
@@ -455,16 +466,17 @@ mod tests {
     fn test_evaluate_at_extension_two_variables() {
         // Polynomial f(X₀, X₁) = 2 + 5X₀ + 3X₁ + 7X₀X₁
         let coeffs = vec![
-            F::from(2), // Constant term
-            F::from(5), // X₁ term
-            F::from(3), // X₀ term
-            F::from(7), // X₀X₁ term
+            F::from(2u32), // Constant term
+            F::from(5u32), // X₁ term
+            F::from(3u32), // X₀ term
+            F::from(7u32), // X₀X₁ term
         ];
         let coeff_list = CoefficientList::new(coeffs);
 
-        let x0 = E::from(2);
-        let x1 = E::from(3);
-        let expected_value = E::from(2) + E::from(5) * x1 + E::from(3) * x0 + E::from(7) * x0 * x1;
+        let x0 = E::from(2u32);
+        let x1 = E::from(3u32);
+        let expected_value =
+            E::from(2u32) + E::from(5u32) * x1 + E::from(3u32) * x0 + E::from(7u32) * x0 * x1;
         let eval_result = coeff_list.evaluate_at_extension(&MultilinearPoint(vec![x0, x1]));
 
         assert_eq!(eval_result, expected_value);
@@ -474,30 +486,30 @@ mod tests {
     fn test_evaluate_at_extension_three_variables() {
         // Polynomial: f(X₀, X₁, X₂) = 1 + 2X₂ + 3X₁ + 5X₁X₂ + 4X₀ + 6X₀X₂ + 7X₀X₁ + 8X₀X₁X₂
         let coeffs = vec![
-            F::from(1), // Constant term (000)
-            F::from(2), // X₂ (001)
-            F::from(3), // X₁ (010)
-            F::from(5), // X₁X₂ (011)
-            F::from(4), // X₀ (100)
-            F::from(6), // X₀X₂ (101)
-            F::from(7), // X₀X₁ (110)
-            F::from(8), // X₀X₁X₂ (111)
+            F::from(1u32), // Constant term (000)
+            F::from(2u32), // X₂ (001)
+            F::from(3u32), // X₁ (010)
+            F::from(5u32), // X₁X₂ (011)
+            F::from(4u32), // X₀ (100)
+            F::from(6u32), // X₀X₂ (101)
+            F::from(7u32), // X₀X₁ (110)
+            F::from(8u32), // X₀X₁X₂ (111)
         ];
         let coeff_list = CoefficientList::new(coeffs);
 
-        let x0 = E::from(2);
-        let x1 = E::from(3);
-        let x2 = E::from(4);
+        let x0 = E::from(2u32);
+        let x1 = E::from(3u32);
+        let x2 = E::from(4u32);
 
         // Correct expected value based on the coefficient order
-        let expected_value = E::from(1)
-            + E::from(2) * x2
-            + E::from(3) * x1
-            + E::from(5) * x1 * x2
-            + E::from(4) * x0
-            + E::from(6) * x0 * x2
-            + E::from(7) * x0 * x1
-            + E::from(8) * x0 * x1 * x2;
+        let expected_value = E::from(1u32)
+            + E::from(2u32) * x2
+            + E::from(3u32) * x1
+            + E::from(5u32) * x1 * x2
+            + E::from(4u32) * x0
+            + E::from(6u32) * x0 * x2
+            + E::from(7u32) * x0 * x1
+            + E::from(8u32) * x0 * x1 * x2;
 
         let eval_result = coeff_list.evaluate_at_extension(&MultilinearPoint(vec![x0, x1, x2]));
 
@@ -509,8 +521,8 @@ mod tests {
         // Zero polynomial f(X) = 0
         let coeff_list = CoefficientList::new(vec![F::ZERO; 4]); // f(X₀, X₁) = 0
 
-        let x0 = E::from(5);
-        let x1 = E::from(7);
+        let x0 = E::from(5u32);
+        let x1 = E::from(7u32);
         let eval_result = coeff_list.evaluate_at_extension(&MultilinearPoint(vec![x0, x1]));
 
         assert_eq!(eval_result, E::ZERO);
@@ -519,15 +531,15 @@ mod tests {
     #[test]
     fn test_evaluate_at_univariate_degree_one() {
         // Polynomial: f(x) = 3 + 4x
-        let c0 = F::from(3);
-        let c1 = F::from(4);
+        let c0 = F::from(3u32);
+        let c1 = F::from(4u32);
         let coeffs = vec![c0, c1];
         let poly = CoefficientList::new(coeffs);
 
-        let p0 = F::from(0);
-        let p1 = F::from(1);
-        let p2 = F::from(2);
-        let p3 = F::from(5);
+        let p0 = F::from(0u32);
+        let p1 = F::from(1u32);
+        let p2 = F::from(2u32);
+        let p3 = F::from(5u32);
         let points = vec![p0, p1, p2, p3];
 
         // Manually compute expected values from coeffs
@@ -546,16 +558,16 @@ mod tests {
     #[test]
     fn test_evaluate_at_univariate_degree_three_multiple_points() {
         // Polynomial: f(x) = 1 + 2x + 3x² + 4x³
-        let c0 = F::from(1);
-        let c1 = F::from(2);
-        let c2 = F::from(3);
-        let c3 = F::from(4);
+        let c0 = F::from(1u32);
+        let c1 = F::from(2u32);
+        let c2 = F::from(3u32);
+        let c3 = F::from(4u32);
         let coeffs = vec![c0, c1, c2, c3];
         let poly = CoefficientList::new(coeffs);
 
-        let p0 = F::from(0);
-        let p1 = F::from(1);
-        let p2 = F::from(2);
+        let p0 = F::from(0u32);
+        let p1 = F::from(1u32);
+        let p2 = F::from(2u32);
         let points = vec![p0, p1, p2];
 
         // f(x) = c0 + c1*x + c2*x² + c3*x³
@@ -572,14 +584,14 @@ mod tests {
     #[test]
     fn test_evaluate_at_univariate_equivalence_to_multilinear() {
         // Polynomial: f(x) = 5 + 6x + 7x² + 8x³
-        let c0 = F::from(5);
-        let c1 = F::from(6);
-        let c2 = F::from(7);
-        let c3 = F::from(8);
+        let c0 = F::from(5u32);
+        let c1 = F::from(6u32);
+        let c2 = F::from(7u32);
+        let c3 = F::from(8u32);
         let coeffs = vec![c0, c1, c2, c3];
         let poly = CoefficientList::new(coeffs);
 
-        let x = F::from(2);
+        let x = F::from(2u32);
 
         let expected = c0 + c1 * x + c2 * x.square() + c3 * x.square() * x;
 

@@ -1,8 +1,9 @@
 use std::ops::Index;
 
-use ark_ff::Field;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use serde::{Deserialize, Serialize};
+// use ark_ff::Field;
+// use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+// use serde::{Deserialize, Serialize};
+use arith::Field;
 
 use super::{lagrange_iterator::LagrangePolynomialIterator, multilinear::MultilinearPoint};
 
@@ -10,11 +11,12 @@ use super::{lagrange_iterator::LagrangePolynomialIterator, multilinear::Multilin
 /// over the hypercube `{0,1}^{num_variables}`.
 ///
 /// The vector `evals` contains function evaluations at **lexicographically ordered** points.
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
+// #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+// #[serde(bound = "F: CanonicalSerialize + CanonicalDeserialize")]
 pub struct EvaluationsList<F> {
     /// Stores evaluations in **lexicographic order**.
-    #[serde(with = "crate::ark_serde")]
+    // #[serde(with = "crate::ark_serde")]
     evals: Vec<F>,
     /// Number of variables in the multilinear polynomial.
     /// Ensures `evals.len() = 2^{num_variables}`.
@@ -181,14 +183,21 @@ fn eval_multilinear<F: Field>(evals: &[F], point: &[F]) -> F {
 #[cfg(test)]
 #[allow(clippy::should_panic_without_expect)]
 mod tests {
-    use ark_ff::AdditiveGroup;
+    // use ark_ff::AdditiveGroup;
+    use arith::Field;
+    use goldilocks::Goldilocks;
 
     use super::*;
-    use crate::{crypto::fields::Field64, poly_utils::hypercube::BinaryHypercube};
+    use crate::poly_utils::hypercube::BinaryHypercube;
 
     #[test]
     fn test_new_evaluations_list() {
-        let evals = vec![Field64::ZERO, Field64::ONE, Field64::ZERO, Field64::ONE];
+        let evals = vec![
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+        ];
         let evaluations_list = EvaluationsList::new(evals.clone());
 
         assert_eq!(evaluations_list.num_evals(), evals.len());
@@ -200,16 +209,16 @@ mod tests {
     #[should_panic]
     fn test_new_evaluations_list_invalid_length() {
         // Length is not a power of two, should panic
-        let _ = EvaluationsList::new(vec![Field64::ONE, Field64::ZERO, Field64::ONE]);
+        let _ = EvaluationsList::new(vec![Goldilocks::ONE, Goldilocks::ZERO, Goldilocks::ONE]);
     }
 
     #[test]
     fn test_indexing() {
         let evals = vec![
-            Field64::from(1),
-            Field64::from(2),
-            Field64::from(3),
-            Field64::from(4),
+            Goldilocks::from(1u32),
+            Goldilocks::from(2u32),
+            Goldilocks::from(3u32),
+            Goldilocks::from(4u32),
         ];
         let evaluations_list = EvaluationsList::new(evals.clone());
 
@@ -222,7 +231,12 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_index_out_of_bounds() {
-        let evals = vec![Field64::ZERO, Field64::ONE, Field64::ZERO, Field64::ONE];
+        let evals = vec![
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+        ];
         let evaluations_list = EvaluationsList::new(evals);
 
         let _ = evaluations_list[4]; // Index out of range, should panic
@@ -231,22 +245,27 @@ mod tests {
     #[test]
     fn test_mutability_of_evals() {
         let mut evals = EvaluationsList::new(vec![
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
         ]);
 
-        assert_eq!(evals.evals()[1], Field64::ONE);
+        assert_eq!(evals.evals()[1], Goldilocks::ONE);
 
-        evals.evals_mut()[1] = Field64::from(5);
+        evals.evals_mut()[1] = Goldilocks::from(5u32);
 
-        assert_eq!(evals.evals()[1], Field64::from(5));
+        assert_eq!(evals.evals()[1], Goldilocks::from(5u32));
     }
 
     #[test]
     fn test_evaluate_on_hypercube_points() {
-        let evaluations_vec = vec![Field64::ZERO, Field64::ONE, Field64::ZERO, Field64::ONE];
+        let evaluations_vec = vec![
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+        ];
         let evals = EvaluationsList::new(evaluations_vec.clone());
 
         for i in BinaryHypercube::new(2) {
@@ -260,13 +279,13 @@ mod tests {
     #[test]
     fn test_evaluate_on_non_hypercube_points() {
         let evals = EvaluationsList::new(vec![
-            Field64::from(1),
-            Field64::from(2),
-            Field64::from(3),
-            Field64::from(4),
+            Goldilocks::from(1u32),
+            Goldilocks::from(2u32),
+            Goldilocks::from(3u32),
+            Goldilocks::from(4u32),
         ]);
 
-        let point = MultilinearPoint(vec![Field64::from(2), Field64::from(3)]);
+        let point = MultilinearPoint(vec![Goldilocks::from(2u32), Goldilocks::from(3u32)]);
 
         let result = evals.evaluate(&point);
 
@@ -280,28 +299,28 @@ mod tests {
 
     #[test]
     fn test_evaluate_edge_cases() {
-        let e1 = Field64::from(7);
-        let e2 = Field64::from(8);
-        let e3 = Field64::from(9);
-        let e4 = Field64::from(10);
+        let e1 = Goldilocks::from(7u32);
+        let e2 = Goldilocks::from(8u32);
+        let e3 = Goldilocks::from(9u32);
+        let e4 = Goldilocks::from(10u32);
 
         let evals = EvaluationsList::new(vec![e1, e2, e3, e4]);
 
         // Evaluating at a binary hypercube point should return the direct value
         assert_eq!(
-            evals.evaluate(&MultilinearPoint(vec![Field64::ZERO, Field64::ZERO])),
+            evals.evaluate(&MultilinearPoint(vec![Goldilocks::ZERO, Goldilocks::ZERO])),
             e1
         );
         assert_eq!(
-            evals.evaluate(&MultilinearPoint(vec![Field64::ZERO, Field64::ONE])),
+            evals.evaluate(&MultilinearPoint(vec![Goldilocks::ZERO, Goldilocks::ONE])),
             e2
         );
         assert_eq!(
-            evals.evaluate(&MultilinearPoint(vec![Field64::ONE, Field64::ZERO])),
+            evals.evaluate(&MultilinearPoint(vec![Goldilocks::ONE, Goldilocks::ZERO])),
             e3
         );
         assert_eq!(
-            evals.evaluate(&MultilinearPoint(vec![Field64::ONE, Field64::ONE])),
+            evals.evaluate(&MultilinearPoint(vec![Goldilocks::ONE, Goldilocks::ONE])),
             e4
         );
     }
@@ -309,10 +328,10 @@ mod tests {
     #[test]
     fn test_num_evals() {
         let evals = EvaluationsList::new(vec![
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         assert_eq!(evals.num_evals(), 4);
     }
@@ -320,10 +339,10 @@ mod tests {
     #[test]
     fn test_num_variables() {
         let evals = EvaluationsList::new(vec![
-            Field64::ONE,
-            Field64::ZERO,
-            Field64::ONE,
-            Field64::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
+            Goldilocks::ONE,
+            Goldilocks::ZERO,
         ]);
         assert_eq!(evals.num_variables(), 2);
     }
@@ -331,10 +350,10 @@ mod tests {
     #[test]
     fn test_eval_extension_on_hypercube_points() {
         let evals = vec![
-            Field64::from(1),
-            Field64::from(2),
-            Field64::from(3),
-            Field64::from(4),
+            Goldilocks::from(1u32),
+            Goldilocks::from(2u32),
+            Goldilocks::from(3u32),
+            Goldilocks::from(4u32),
         ];
         let eval_list = EvaluationsList::new(evals.clone());
 
@@ -349,13 +368,13 @@ mod tests {
     #[test]
     fn test_eval_extension_on_non_hypercube_points() {
         let evals = EvaluationsList::new(vec![
-            Field64::from(1),
-            Field64::from(2),
-            Field64::from(3),
-            Field64::from(4),
+            Goldilocks::from(1u32),
+            Goldilocks::from(2u32),
+            Goldilocks::from(3u32),
+            Goldilocks::from(4u32),
         ]);
 
-        let point = MultilinearPoint(vec![Field64::from(2), Field64::from(3)]);
+        let point = MultilinearPoint(vec![Goldilocks::from(2u32), Goldilocks::from(3u32)]);
 
         let result = evals.eval_extension(&point);
 
@@ -367,12 +386,12 @@ mod tests {
 
     #[test]
     fn test_eval_multilinear_1d() {
-        let a = Field64::from(5);
-        let b = Field64::from(10);
+        let a = Goldilocks::from(5u32);
+        let b = Goldilocks::from(10u32);
         let evals = vec![a, b];
 
         // Evaluate at midpoint `x = 1/2`
-        let x = Field64::from(1) / Field64::from(2);
+        let x = Goldilocks::INV_2;
         let expected = a + (b - a) * x;
 
         assert_eq!(eval_multilinear(&evals, &[x]), expected);
@@ -380,24 +399,24 @@ mod tests {
 
     #[test]
     fn test_eval_multilinear_2d() {
-        let a = Field64::from(1);
-        let b = Field64::from(2);
-        let c = Field64::from(3);
-        let d = Field64::from(4);
+        let a = Goldilocks::from(1u32);
+        let b = Goldilocks::from(2u32);
+        let c = Goldilocks::from(3u32);
+        let d = Goldilocks::from(4u32);
 
         // The evaluations are stored in lexicographic order for (x, y)
         // f(0,0) = a, f(0,1) = c, f(1,0) = b, f(1,1) = d
         let evals = vec![a, b, c, d];
 
         // Evaluate at `(x, y) = (1/2, 1/2)`
-        let x = Field64::from(1) / Field64::from(2);
-        let y = Field64::from(1) / Field64::from(2);
+        let x = Goldilocks::INV_2;
+        let y = Goldilocks::INV_2;
 
         // Interpolation formula:
         // f(x, y) = (1-x)(1-y) * f(0,0) + (1-x)y * f(0,1) + x(1-y) * f(1,0) + xy * f(1,1)
-        let expected = (Field64::ONE - x) * (Field64::ONE - y) * a
-            + (Field64::ONE - x) * y * c
-            + x * (Field64::ONE - y) * b
+        let expected = (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * a
+            + (Goldilocks::ONE - x) * y * c
+            + x * (Goldilocks::ONE - y) * b
             + x * y * d;
 
         assert_eq!(eval_multilinear(&evals, &[x, y]), expected);
@@ -405,32 +424,32 @@ mod tests {
 
     #[test]
     fn test_eval_multilinear_3d() {
-        let a = Field64::from(1);
-        let b = Field64::from(2);
-        let c = Field64::from(3);
-        let d = Field64::from(4);
-        let e = Field64::from(5);
-        let f = Field64::from(6);
-        let g = Field64::from(7);
-        let h = Field64::from(8);
+        let a = Goldilocks::from(1u32);
+        let b = Goldilocks::from(2u32);
+        let c = Goldilocks::from(3u32);
+        let d = Goldilocks::from(4u32);
+        let e = Goldilocks::from(5u32);
+        let f = Goldilocks::from(6u32);
+        let g = Goldilocks::from(7u32);
+        let h = Goldilocks::from(8u32);
 
         // The evaluations are stored in lexicographic order for (x, y, z)
         // f(0,0,0) = a, f(0,0,1) = c, f(0,1,0) = b, f(0,1,1) = e
         // f(1,0,0) = d, f(1,0,1) = f, f(1,1,0) = g, f(1,1,1) = h
         let evals = vec![a, b, c, e, d, f, g, h];
 
-        let x = Field64::from(1) / Field64::from(3);
-        let y = Field64::from(1) / Field64::from(3);
-        let z = Field64::from(1) / Field64::from(3);
+        let x = Goldilocks::from(1u32) * Goldilocks::from(3u32).inv().unwrap();
+        let y = Goldilocks::from(1u32) * Goldilocks::from(3u32).inv().unwrap();
+        let z = Goldilocks::from(1u32) * Goldilocks::from(3u32).inv().unwrap();
 
         // Using trilinear interpolation formula:
-        let expected = (Field64::ONE - x) * (Field64::ONE - y) * (Field64::ONE - z) * a
-            + (Field64::ONE - x) * (Field64::ONE - y) * z * c
-            + (Field64::ONE - x) * y * (Field64::ONE - z) * b
-            + (Field64::ONE - x) * y * z * e
-            + x * (Field64::ONE - y) * (Field64::ONE - z) * d
-            + x * (Field64::ONE - y) * z * f
-            + x * y * (Field64::ONE - z) * g
+        let expected = (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * a
+            + (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * z * c
+            + (Goldilocks::ONE - x) * y * (Goldilocks::ONE - z) * b
+            + (Goldilocks::ONE - x) * y * z * e
+            + x * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * d
+            + x * (Goldilocks::ONE - y) * z * f
+            + x * y * (Goldilocks::ONE - z) * g
             + x * y * z * h;
 
         assert_eq!(eval_multilinear(&evals, &[x, y, z]), expected);
@@ -438,49 +457,52 @@ mod tests {
 
     #[test]
     fn test_eval_multilinear_4d() {
-        let a = Field64::from(1);
-        let b = Field64::from(2);
-        let c = Field64::from(3);
-        let d = Field64::from(4);
-        let e = Field64::from(5);
-        let f = Field64::from(6);
-        let g = Field64::from(7);
-        let h = Field64::from(8);
-        let i = Field64::from(9);
-        let j = Field64::from(10);
-        let k = Field64::from(11);
-        let l = Field64::from(12);
-        let m = Field64::from(13);
-        let n = Field64::from(14);
-        let o = Field64::from(15);
-        let p = Field64::from(16);
+        let a = Goldilocks::from(1u32);
+        let b = Goldilocks::from(2u32);
+        let c = Goldilocks::from(3u32);
+        let d = Goldilocks::from(4u32);
+        let e = Goldilocks::from(5u32);
+        let f = Goldilocks::from(6u32);
+        let g = Goldilocks::from(7u32);
+        let h = Goldilocks::from(8u32);
+        let i = Goldilocks::from(9u32);
+        let j = Goldilocks::from(10u32);
+        let k = Goldilocks::from(11u32);
+        let l = Goldilocks::from(12u32);
+        let m = Goldilocks::from(13u32);
+        let n = Goldilocks::from(14u32);
+        let o = Goldilocks::from(15u32);
+        let p = Goldilocks::from(16u32);
 
         // Evaluations stored in lexicographic order for (x, y, z, w)
         let evals = vec![a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p];
 
-        let x = Field64::from(1) / Field64::from(2);
-        let y = Field64::from(2) / Field64::from(3);
-        let z = Field64::from(1) / Field64::from(4);
-        let w = Field64::from(3) / Field64::from(5);
+        let x = Goldilocks::from(1u32) * Goldilocks::from(2u32).inv().unwrap();
+        let y = Goldilocks::from(2u32) * Goldilocks::from(3u32).inv().unwrap();
+        let z = Goldilocks::from(1u32) * Goldilocks::from(4u32).inv().unwrap();
+        let w = Goldilocks::from(3u32) * Goldilocks::from(5u32).inv().unwrap();
 
         // Quadlinear interpolation formula
-        let expected =
-            (Field64::ONE - x) * (Field64::ONE - y) * (Field64::ONE - z) * (Field64::ONE - w) * a
-                + (Field64::ONE - x) * (Field64::ONE - y) * (Field64::ONE - z) * w * b
-                + (Field64::ONE - x) * (Field64::ONE - y) * z * (Field64::ONE - w) * c
-                + (Field64::ONE - x) * (Field64::ONE - y) * z * w * d
-                + (Field64::ONE - x) * y * (Field64::ONE - z) * (Field64::ONE - w) * e
-                + (Field64::ONE - x) * y * (Field64::ONE - z) * w * f
-                + (Field64::ONE - x) * y * z * (Field64::ONE - w) * g
-                + (Field64::ONE - x) * y * z * w * h
-                + x * (Field64::ONE - y) * (Field64::ONE - z) * (Field64::ONE - w) * i
-                + x * (Field64::ONE - y) * (Field64::ONE - z) * w * j
-                + x * (Field64::ONE - y) * z * (Field64::ONE - w) * k
-                + x * (Field64::ONE - y) * z * w * l
-                + x * y * (Field64::ONE - z) * (Field64::ONE - w) * m
-                + x * y * (Field64::ONE - z) * w * n
-                + x * y * z * (Field64::ONE - w) * o
-                + x * y * z * w * p;
+        let expected = (Goldilocks::ONE - x)
+            * (Goldilocks::ONE - y)
+            * (Goldilocks::ONE - z)
+            * (Goldilocks::ONE - w)
+            * a
+            + (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * w * b
+            + (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * z * (Goldilocks::ONE - w) * c
+            + (Goldilocks::ONE - x) * (Goldilocks::ONE - y) * z * w * d
+            + (Goldilocks::ONE - x) * y * (Goldilocks::ONE - z) * (Goldilocks::ONE - w) * e
+            + (Goldilocks::ONE - x) * y * (Goldilocks::ONE - z) * w * f
+            + (Goldilocks::ONE - x) * y * z * (Goldilocks::ONE - w) * g
+            + (Goldilocks::ONE - x) * y * z * w * h
+            + x * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * (Goldilocks::ONE - w) * i
+            + x * (Goldilocks::ONE - y) * (Goldilocks::ONE - z) * w * j
+            + x * (Goldilocks::ONE - y) * z * (Goldilocks::ONE - w) * k
+            + x * (Goldilocks::ONE - y) * z * w * l
+            + x * y * (Goldilocks::ONE - z) * (Goldilocks::ONE - w) * m
+            + x * y * (Goldilocks::ONE - z) * w * n
+            + x * y * z * (Goldilocks::ONE - w) * o
+            + x * y * z * w * p;
 
         // Validate against the function output
         assert_eq!(eval_multilinear(&evals, &[x, y, z, w]), expected);

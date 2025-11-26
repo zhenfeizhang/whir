@@ -1,12 +1,13 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
-use ark_crypto_primitives::{
-    crh::{CRHScheme, TwoToOneCRHScheme},
-    Error,
-};
-use ark_serialize::CanonicalSerialize;
+// use ark_crypto_primitives::{
+//     crh::{CRHScheme, TwoToOneCRHScheme},
+//     Error,
+// };
+// use ark_serialize::CanonicalSerialize;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use serdes::ExpSerde;
 
 use super::{digest::GenericDigest, parameters::MerkleTreeParams, HashCounter};
 
@@ -24,9 +25,8 @@ pub type Blake3MerkleTreeParams<F> =
 /// This struct implements `CRHScheme` where the input is a slice of
 /// canonical-serializable field elements `[F]`, and the output is a
 /// 32-byte Blake3 digest.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(bound = "")]
-pub struct Blake3LeafHash<F>(#[serde(skip)] PhantomData<F>);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Blake3LeafHash<F>(PhantomData<F>);
 
 impl<F: CanonicalSerialize + Send> CRHScheme for Blake3LeafHash<F> {
     type Input = [F];

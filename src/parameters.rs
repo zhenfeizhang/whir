@@ -4,11 +4,11 @@ use std::{
     str::FromStr,
 };
 
-use ark_crypto_primitives::merkle_tree::{Config, LeafParam, TwoToOneParam};
-use serde::{Deserialize, Serialize};
+// use ark_crypto_primitives::merkle_tree::{Config, LeafParam, TwoToOneParam};
+// use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::utils::ark_eq;
+// use crate::utils::ark_eq;
 
 /// Computes the default maximum proof-of-work (PoW) bits.
 ///
@@ -19,7 +19,8 @@ pub const fn default_max_pow(num_variables: usize, log_inv_rate: usize) -> usize
 }
 
 /// Defines the soundness type for the proof system.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SoundnessType {
     /// Unique decoding guarantees a single valid witness.
     UniqueDecoding,
@@ -53,12 +54,13 @@ impl FromStr for SoundnessType {
 }
 
 /// Represents the parameters for a multivariate polynomial.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(bound = "")]
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// #[serde(bound = "")]
 pub struct MultivariateParameters<F> {
     /// The number of variables in the polynomial.
     pub(crate) num_variables: usize,
-    #[serde(skip)]
+    // #[serde(skip)]
     _field: PhantomData<F>,
 }
 
@@ -93,7 +95,8 @@ pub enum FoldingFactorError {
 }
 
 /// Defines the folding factor for polynomial commitments.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FoldingFactor {
     /// A fixed folding factor used in all rounds.
     Constant(usize),
@@ -207,11 +210,13 @@ impl FoldingFactor {
 }
 
 /// Configuration parameters for WHIR proofs.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ProtocolParameters<MerkleConfig, PowStrategy>
-where
-    MerkleConfig: Config,
-{
+// #[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq)]
+// pub struct ProtocolParameters<MerkleConfig, PowStrategy>
+// where
+//     MerkleConfig: Config,
+
+pub struct ProtocolParameters<PowStrategy> {
     /// Whether the initial statement is included in the proof.
     pub initial_statement: bool,
     /// The logarithmic inverse rate for sampling.
@@ -226,47 +231,39 @@ where
     pub pow_bits: usize,
     /// Phantom type for PoW parameters.
     pub _pow_parameters: PhantomData<PowStrategy>,
-    /// Parameters for hashing Merkle tree leaves.
-    ///
-    /// These define how individual leaves in the Merkle tree are hashed.
-    #[serde(with = "crate::ark_serde")]
-    pub leaf_hash_params: LeafParam<MerkleConfig>,
-    /// Parameters for hashing inner nodes in the Merkle tree.
-    ///
-    /// These define the hashing function used when combining two child nodes into a parent node.
-    #[serde(with = "crate::ark_serde")]
-    pub two_to_one_params: TwoToOneParam<MerkleConfig>,
+    // /// Parameters for hashing Merkle tree leaves.
+    // ///
+    // /// These define how individual leaves in the Merkle tree are hashed.
+    // #[serde(with = "crate::ark_serde")]
+    // pub leaf_hash_params: LeafParam<MerkleConfig>,
+    // /// Parameters for hashing inner nodes in the Merkle tree.
+    // ///
+    // /// These define the hashing function used when combining two child nodes into a parent node.
+    // #[serde(with = "crate::ark_serde")]
+    // pub two_to_one_params: TwoToOneParam<MerkleConfig>,
 }
 
-impl<MerkleConfig, PowStrategy> Debug for ProtocolParameters<MerkleConfig, PowStrategy>
-where
-    MerkleConfig: Config,
-{
+impl<PowStrategy> Debug for ProtocolParameters<PowStrategy> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "WhirParameters {self}")
     }
 }
 
-impl<MerkleConfig, PowStrategy> PartialEq for ProtocolParameters<MerkleConfig, PowStrategy>
-where
-    MerkleConfig: Config,
-{
-    fn eq(&self, other: &Self) -> bool {
-        ark_eq(&self.leaf_hash_params, &other.leaf_hash_params)
-            && ark_eq(&self.two_to_one_params, &other.two_to_one_params)
-            && self.initial_statement == other.initial_statement
-            && self.starting_log_inv_rate == other.starting_log_inv_rate
-            && self.folding_factor == other.folding_factor
-            && self.soundness_type == other.soundness_type
-            && self.security_level == other.security_level
-            && self.pow_bits == other.pow_bits
-    }
-}
+// impl< PowStrategy> PartialEq for ProtocolParameters< PowStrategy>
+// {
+//     fn eq(&self, other: &Self) -> bool {
+//         ark_eq(&self.leaf_hash_params, &other.leaf_hash_params)
+//             && ark_eq(&self.two_to_one_params, &other.two_to_one_params)
+//             && self.initial_statement == other.initial_statement
+//             && self.starting_log_inv_rate == other.starting_log_inv_rate
+//             && self.folding_factor == other.folding_factor
+//             && self.soundness_type == other.soundness_type
+//             && self.security_level == other.security_level
+//             && self.pow_bits == other.pow_bits
+//     }
+// }
 
-impl<MerkleConfig, PowStrategy> Display for ProtocolParameters<MerkleConfig, PowStrategy>
-where
-    MerkleConfig: Config,
-{
+impl<PowStrategy> Display for ProtocolParameters<PowStrategy> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
@@ -285,7 +282,7 @@ where
 mod tests {
 
     use super::*;
-    use crate::{crypto::fields::Field256, utils::test_serde};
+    // use crate::{crypto::fields::Field256, utils::test_serde};
 
     #[test]
     fn test_default_max_pow() {
@@ -332,10 +329,10 @@ mod tests {
         assert_eq!(params.to_string(), "Number of variables: 5");
     }
 
-    #[test]
-    fn test_multivariate_parameters_serde() {
-        test_serde(&MultivariateParameters::<Field256>::new(10));
-    }
+    // #[test]
+    // fn test_multivariate_parameters_serde() {
+    //     test_serde(&MultivariateParameters::<Field256>::new(10));
+    // }
 
     #[test]
     fn test_folding_factor_at_round() {

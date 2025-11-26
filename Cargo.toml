@@ -35,9 +35,19 @@ redundant_closure_for_method_calls = "allow"
 [dependencies]
 ark-std = { version = "0.5", features = ["std"] }
 ark-ff = { version = "0.5", features = ["asm", "std"] }
-ark-serialize = "0.5"
+# ark-serialize = "0.5"
 ark-crypto-primitives = { version = "0.5", features = ["merkle_tree"] }
 ark-poly = "0.5"
+
+arith = { path = "../../Expander/arith" }
+goldilocks = { path = "../../Expander/arith/goldilocks" }
+gkr_hashers = { path = "../../Expander/hasher" }
+gkr_engine = { path = "../../Expander/gkr_engine" }
+polynomials = { path = "../../Expander/arith/polynomials" }
+serdes = { path = "../../Expander/serdes" }
+tree = { path = "../../Expander/tree" }
+transcript = { path = "../../Expander/transcript" }
+
 blake3 = "1.5.0"
 sha3 = "0.10"
 rand = "0.8"
@@ -64,15 +74,15 @@ divan = { version = "2.10.0", package = "codspeed-divan-compat" }
 debug = true
 
 [features]
-default = ["parallel"]
+default = [ "parallel" ]
 parallel = [
     "dep:rayon",
-    "ark-poly/parallel",
-    "ark-ff/parallel",
-    "ark-crypto-primitives/parallel",
+    # "ark-poly/parallel",
+    # "ark-ff/parallel",
+    # "ark-crypto-primitives/parallel",
 ]
 rayon = ["dep:rayon"]
-asm = ["ark-ff/asm"]
+# asm = ["ark-ff/asm"]
 tracing = ["dep:tracing"]
 
 [[bench]]

@@ -1,4 +1,5 @@
-use ark_ff::Field;
+// use ark_ff::Field;
+use arith::Field;
 
 use crate::poly_utils::multilinear::MultilinearPoint;
 
@@ -122,14 +123,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use ark_ff::AdditiveGroup;
+    // use ark_ff::AdditiveGroup;
+
+    use goldilocks::Goldilocks;
 
     use super::*;
-    use crate::crypto::fields::Field64;
+    // use crate::crypto::fields::Goldilocks;
 
     #[test]
     fn test_binary_to_ternary_index() {
-        let poly = SumcheckPolynomial::new(vec![Field64::ZERO; 9], 2);
+        let poly = SumcheckPolynomial::new(vec![Goldilocks::ZERO; 9], 2);
 
         // Binary indices: 0, 1, 2, 3 (for 2 variables: {00, 01, 10, 11})
         // Corresponding ternary indices: 0, 1, 3, 4
@@ -141,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_binary_to_ternary_index_three_vars() {
-        let poly = SumcheckPolynomial::new(vec![Field64::ZERO; 27], 3);
+        let poly = SumcheckPolynomial::new(vec![Goldilocks::ZERO; 27], 3);
 
         // Check conversion for all binary points in {0,1}^3
         assert_eq!(poly.binary_to_ternary_index(0b000), 0);
@@ -159,14 +162,14 @@ mod tests {
         // Test case for a single variable (n_variables = 1)
         // Function values at {0,1,2}: f(0) = 3, f(1) = 5, f(2) = 7
         let evaluations = vec![
-            Field64::from(3), // f(0)
-            Field64::from(5), // f(1)
-            Field64::from(7), // f(2)
+            Goldilocks::from(3u32), // f(0)
+            Goldilocks::from(5u32), // f(1)
+            Goldilocks::from(7u32), // f(2)
         ];
         let poly = SumcheckPolynomial::new(evaluations, 1);
 
         // Sum over {0,1}: f(0) + f(1)
-        let expected_sum = Field64::from(3) + Field64::from(5);
+        let expected_sum = Goldilocks::from(3u32) + Goldilocks::from(5u32);
         assert_eq!(poly.sum_over_boolean_hypercube(), expected_sum);
     }
 
@@ -176,12 +179,14 @@ mod tests {
         // f(0,0) = 1, f(0,1) = 2, f(0,2) = 3
         // f(1,0) = 4, f(1,1) = 5, f(1,2) = 6
         // f(2,0) = 7, f(2,1) = 8, f(2,2) = 9
-        let evaluations: Vec<_> = (1..=9).map(Field64::from).collect();
+        let evaluations: Vec<_> = (1u32..=9).map(Goldilocks::from).collect();
         let poly = SumcheckPolynomial::new(evaluations, 2);
 
         // Sum over {0,1}^2: f(0,0) + f(0,1) + f(1,0) + f(1,1)
-        let expected_sum =
-            Field64::from(1) + Field64::from(2) + Field64::from(4) + Field64::from(5);
+        let expected_sum = Goldilocks::from(1u32)
+            + Goldilocks::from(2u32)
+            + Goldilocks::from(4u32)
+            + Goldilocks::from(5u32);
         let computed_sum = poly.sum_over_boolean_hypercube();
         assert_eq!(computed_sum, expected_sum);
     }
@@ -202,18 +207,18 @@ mod tests {
         // f(2,0,0) = 19 f(2,0,1) = 20 f(2,0,2) = 21
         // f(2,1,0) = 22 f(2,1,1) = 23 f(2,1,2) = 24
         // f(2,2,0) = 25 f(2,2,1) = 26 f(2,2,2) = 27
-        let evaluations: Vec<_> = (1..=27).map(Field64::from).collect();
+        let evaluations: Vec<_> = (1u32..=27).map(Goldilocks::from).collect();
         let poly = SumcheckPolynomial::new(evaluations, 3);
 
         // Sum over {0,1}^3
-        let expected_sum = Field64::from(1)
-            + Field64::from(2)
-            + Field64::from(4)
-            + Field64::from(5)
-            + Field64::from(10)
-            + Field64::from(11)
-            + Field64::from(13)
-            + Field64::from(14);
+        let expected_sum = Goldilocks::from(1u32)
+            + Goldilocks::from(2u32)
+            + Goldilocks::from(4u32)
+            + Goldilocks::from(5u32)
+            + Goldilocks::from(10u32)
+            + Goldilocks::from(11u32)
+            + Goldilocks::from(13u32)
+            + Goldilocks::from(14u32);
 
         assert_eq!(poly.sum_over_boolean_hypercube(), expected_sum);
     }
@@ -224,24 +229,24 @@ mod tests {
         // f(0,0) = 1, f(0,1) = 2, f(0,2) = 3
         // f(1,0) = 4, f(1,1) = 5, f(1,2) = 6
         // f(2,0) = 7, f(2,1) = 8, f(2,2) = 9
-        let evaluations: Vec<_> = (1..=9).map(Field64::from).collect();
+        let evaluations: Vec<_> = (1u32..=9).map(Goldilocks::from).collect();
         let poly = SumcheckPolynomial::new(evaluations, 2);
 
         // Define an evaluation point (0.5, 0.5) as an interpolation between {0,1,2}^2
-        let point = MultilinearPoint(vec![Field64::from(1) / Field64::from(2); 2]);
+        let point = MultilinearPoint(vec![Goldilocks::INV_2; 2]);
 
         let result = poly.evaluate_at_point(&point);
 
         // Compute the expected result using the full weighted sum:
-        let expected_value = Field64::from(1) * point.eq_poly3(0)
-            + Field64::from(2) * point.eq_poly3(1)
-            + Field64::from(3) * point.eq_poly3(2)
-            + Field64::from(4) * point.eq_poly3(3)
-            + Field64::from(5) * point.eq_poly3(4)
-            + Field64::from(6) * point.eq_poly3(5)
-            + Field64::from(7) * point.eq_poly3(6)
-            + Field64::from(8) * point.eq_poly3(7)
-            + Field64::from(9) * point.eq_poly3(8);
+        let expected_value = Goldilocks::from(1u32) * point.eq_poly3(0)
+            + Goldilocks::from(2u32) * point.eq_poly3(1)
+            + Goldilocks::from(3u32) * point.eq_poly3(2)
+            + Goldilocks::from(4u32) * point.eq_poly3(3)
+            + Goldilocks::from(5u32) * point.eq_poly3(4)
+            + Goldilocks::from(6u32) * point.eq_poly3(5)
+            + Goldilocks::from(7u32) * point.eq_poly3(6)
+            + Goldilocks::from(8u32) * point.eq_poly3(7)
+            + Goldilocks::from(9u32) * point.eq_poly3(8);
 
         assert_eq!(result, expected_value);
     }
@@ -249,16 +254,16 @@ mod tests {
     #[test]
     fn test_evaluate_at_point_three_vars() {
         // Define a function with three variables
-        let evaluations: Vec<_> = (1..=27).map(Field64::from).collect();
+        let evaluations: Vec<_> = (1u32..=27).map(Goldilocks::from).collect();
         let poly = SumcheckPolynomial::new(evaluations, 3);
 
         // Define an interpolation point (1/2, 1/2, 1/2) in {0,1,2}^3
-        let point = MultilinearPoint(vec![Field64::from(1) / Field64::from(2); 3]);
+        let point = MultilinearPoint(vec![Goldilocks::INV_2; 3]);
 
         // Compute expected evaluation:
         let expected_value = (0..27)
             .map(|i| poly.evaluations[i] * point.eq_poly3(i))
-            .sum::<Field64>();
+            .sum::<Goldilocks>();
 
         let computed_value = poly.evaluate_at_point(&point);
         assert_eq!(computed_value, expected_value);

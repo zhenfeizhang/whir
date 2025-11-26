@@ -10,7 +10,8 @@ mod transpose;
 mod utils;
 mod wavelet;
 
-use ark_ff::FftField;
+use arith::FFTField;
+// use ark_ff::FftField;
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
@@ -30,7 +31,7 @@ pub use self::{
 /// outputs the interleaved alphabets in the same order as the input.
 ///
 #[cfg_attr(feature = "tracing", instrument(skip(poly), fields(size = poly.len())))]
-pub fn interleaved_rs_encode<F: FftField>(
+pub fn interleaved_rs_encode<F: FFTField + 'static>(
     interleaved_coeffs: &[F],
     expansion: usize,
     fold_factor: usize,
@@ -69,17 +70,20 @@ pub fn interleaved_rs_encode<F: FftField>(
 
 #[cfg(test)]
 mod tests {
-    use ark_ff::Field;
+    // use ark_ff::Field;
+    use arith::Field;
+    use ark_std::log2;
+    use goldilocks::Goldilocks;
 
     use super::*;
-    use crate::{crypto::fields::Field64, ntt::cooley_tukey::NttEngine};
+    use crate::ntt::cooley_tukey::NttEngine;
 
     #[test]
     fn test_expand_from_coeff_size_2() {
-        let engine = NttEngine::<Field64>::new_from_fftfield();
+        let engine = NttEngine::<Goldilocks>::new_from_fftfield();
 
-        let c0 = Field64::from(1);
-        let c1 = Field64::from(2);
+        let c0 = Goldilocks::from(1u32);
+        let c1 = Goldilocks::from(2u32);
         let coeffs = vec![c0, c1];
         let expansion = 2;
 
@@ -98,8 +102,8 @@ mod tests {
 
         let f0 = c0;
         let f1 = c1;
-        let f2 = c0 * omega.pow([0]);
-        let f3 = c1 * omega.pow([1]);
+        let f2 = c0 * omega.exp(0u128);
+        let f3 = c1 * omega.exp(1u128);
 
         // Compute the expected NTT
         //
@@ -132,12 +136,12 @@ mod tests {
 
     #[test]
     fn test_expand_from_coeff_size_4() {
-        let engine = NttEngine::<Field64>::new_from_fftfield();
+        let engine = NttEngine::<Goldilocks>::new_from_fftfield();
 
-        let c0 = Field64::from(1);
-        let c1 = Field64::from(2);
-        let c2 = Field64::from(3);
-        let c3 = Field64::from(4);
+        let c0 = Goldilocks::from(1u32);
+        let c1 = Goldilocks::from(2u32);
+        let c2 = Goldilocks::from(3u32);
+        let c3 = Goldilocks::from(4u32);
         let coeffs = vec![c0, c1, c2, c3];
         let expansion = 4;
 
@@ -171,20 +175,20 @@ mod tests {
         let f2 = c2;
         let f3 = c3;
 
-        let f4 = c0 * omega.pow([1]).pow([0]);
-        let f5 = c1 * omega.pow([1]).pow([1]);
-        let f6 = c2 * omega.pow([1]).pow([2]);
-        let f7 = c3 * omega.pow([1]).pow([3]);
+        let f4 = c0 * omega.exp(1u128).exp(0u128);
+        let f5 = c1 * omega.exp(1u128).exp(1u128);
+        let f6 = c2 * omega.exp(1u128).exp(2u128);
+        let f7 = c3 * omega.exp(1u128).exp(3u128);
 
-        let f8 = c0 * omega.pow([2]).pow([0]);
-        let f9 = c1 * omega.pow([2]).pow([1]);
-        let f10 = c2 * omega.pow([2]).pow([2]);
-        let f11 = c3 * omega.pow([2]).pow([3]);
+        let f8 = c0 * omega.exp(2u128).exp(0u128);
+        let f9 = c1 * omega.exp(2u128).exp(1u128);
+        let f10 = c2 * omega.exp(2u128).exp(2u128);
+        let f11 = c3 * omega.exp(2u128).exp(3u128);
 
-        let f12 = c0 * omega.pow([3]).pow([0]);
-        let f13 = c1 * omega.pow([3]).pow([1]);
-        let f14 = c2 * omega.pow([3]).pow([2]);
-        let f15 = c3 * omega.pow([3]).pow([3]);
+        let f12 = c0 * omega.exp(3u128).exp(0u128);
+        let f13 = c1 * omega.exp(3u128).exp(1u128);
+        let f14 = c2 * omega.exp(3u128).exp(2u128);
+        let f15 = c3 * omega.exp(3u128).exp(3u128);
 
         // Compute the expected NTT manually using omega powers
         //
@@ -256,15 +260,21 @@ mod tests {
         let expansion = 4;
         let folding_factor = 6;
 
-        let eval_domain = GeneralEvaluationDomain::<Field64>::new(count * expansion).unwrap();
+        // let eval_domain = GeneralEvaluationDomain::<Goldilocks>::new(count * expansion).unwrap();
+        let eval_domain_size = count * expansion;
+        let group_gen = Goldilocks::two_adic_generator(log2(eval_domain_size) as usize);
+        let group_gen_inv = group_gen.inv().unwrap();
 
-        let poly: Vec<_> = (0..count).map(|_| Field64::rand(&mut rng)).collect();
+        let poly: Vec<_> = (0..count)
+            .map(|_| Goldilocks::random_unsafe(&mut rng))
+            .collect();
 
         // Compute things the old way
         let mut expected = test_utils::expand_from_coeff(&poly, expansion);
         test_utils::transform_evaluations(
             &mut expected,
-            eval_domain.group_gen_inv(),
+            group_gen_inv,
+            // eval_domain.group_gen_inv(),
             folding_factor,
         );
 

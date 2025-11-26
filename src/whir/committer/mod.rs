@@ -19,7 +19,7 @@ where
     MerkleConfig: Config,
 {
     /// The committed polynomial in coefficient form.
-    pub(crate) polynomial: CoefficientList<F>,
+    pub polynomial: CoefficientList<F>,
     /// The Merkle tree constructed from the polynomial evaluations.
     pub(crate) merkle_tree: MerkleTree<MerkleConfig>,
     /// The leaves of the Merkle tree, derived from folded polynomial evaluations.

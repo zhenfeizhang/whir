@@ -1,4 +1,6 @@
-use ark_ff::Field;
+// use ark_ff::Field;
+
+use arith::Field;
 
 /// A univariate polynomial represented in coefficient form.
 ///
@@ -61,108 +63,124 @@ impl<F: Field> WhirDensePolynomial<F> {
 #[cfg(test)]
 mod tests {
     use ark_ff::{AdditiveGroup, Zero};
+    use goldilocks::Goldilocks;
 
     use super::*;
-    use crate::crypto::fields::Field64;
+    // use crate::crypto::fields::Goldilocks;
 
     #[test]
     fn test_zero_polynomial() {
         // A zero polynomial has no coefficients
-        let poly = WhirDensePolynomial::<Field64>::from_coefficients_vec(vec![]);
+        let poly = WhirDensePolynomial::<Goldilocks>::from_coefficients_vec(vec![]);
         assert!(poly.is_zero());
-        assert_eq!(poly.evaluate(&Field64::from(42)), Field64::zero());
+        assert_eq!(poly.evaluate(&Goldilocks::from(42u32)), Goldilocks::zero());
     }
 
     #[test]
     fn test_constant_polynomial() {
         // Polynomial: f(x) = 7
-        let c0 = Field64::from(7);
+        let c0 = Goldilocks::from(7u32);
         let poly = WhirDensePolynomial::from_coefficients_vec(vec![c0]);
 
         // f(0)
-        assert_eq!(poly.evaluate(&Field64::zero()), c0);
+        assert_eq!(poly.evaluate(&Goldilocks::zero()), c0);
         // f(1)
-        assert_eq!(poly.evaluate(&Field64::ONE), c0);
+        assert_eq!(poly.evaluate(&Goldilocks::ONE), c0);
         // f(42)
-        assert_eq!(poly.evaluate(&Field64::from(42)), c0);
+        assert_eq!(poly.evaluate(&Goldilocks::from(42u32)), c0);
     }
 
     #[test]
     fn test_linear_polynomial() {
         // Polynomial: f(x) = 3 + 4x
-        let c0 = Field64::from(3);
-        let c1 = Field64::from(4);
+        let c0 = Goldilocks::from(3u32);
+        let c1 = Goldilocks::from(4u32);
         let poly = WhirDensePolynomial::from_coefficients_vec(vec![c0, c1]);
 
         // f(0)
-        assert_eq!(poly.evaluate(&Field64::zero()), c0);
+        assert_eq!(poly.evaluate(&Goldilocks::zero()), c0);
         // f(1)
-        assert_eq!(poly.evaluate(&Field64::ONE), c0 + c1 * Field64::ONE);
+        assert_eq!(poly.evaluate(&Goldilocks::ONE), c0 + c1 * Goldilocks::ONE);
         // f(2)
-        assert_eq!(poly.evaluate(&Field64::from(2)), c0 + c1 * Field64::from(2));
+        assert_eq!(
+            poly.evaluate(&Goldilocks::from(2u32)),
+            c0 + c1 * Goldilocks::from(2u32)
+        );
     }
 
     #[test]
     fn test_quadratic_polynomial() {
         // Polynomial: f(x) = 2 + 0x + 5x²
-        let c0 = Field64::from(2);
-        let c1 = Field64::from(0);
-        let c2 = Field64::from(5);
+        let c0 = Goldilocks::from(2u32);
+        let c1 = Goldilocks::from(0u32);
+        let c2 = Goldilocks::from(5u32);
         let poly = WhirDensePolynomial::from_coefficients_vec(vec![c0, c1, c2]);
 
         // f(0)
-        assert_eq!(poly.evaluate(&Field64::zero()), c0);
+        assert_eq!(poly.evaluate(&Goldilocks::zero()), c0);
         // f(1)
-        assert_eq!(poly.evaluate(&Field64::ONE), c0 + c2);
+        assert_eq!(poly.evaluate(&Goldilocks::ONE), c0 + c2);
         // f(2)
-        assert_eq!(poly.evaluate(&Field64::from(2)), c0 + c2 * Field64::from(4));
+        assert_eq!(
+            poly.evaluate(&Goldilocks::from(2u32)),
+            c0 + c2 * Goldilocks::from(4u32)
+        );
     }
 
     #[test]
     fn test_cubic_polynomial() {
         // Polynomial: f(x) = 1 + 2x + 3x² + 4x³
-        let c0 = Field64::from(1);
-        let c1 = Field64::from(2);
-        let c2 = Field64::from(3);
-        let c3 = Field64::from(4);
+        let c0 = Goldilocks::from(1u32);
+        let c1 = Goldilocks::from(2u32);
+        let c2 = Goldilocks::from(3u32);
+        let c3 = Goldilocks::from(4u32);
         let poly = WhirDensePolynomial::from_coefficients_vec(vec![c0, c1, c2, c3]);
 
         // f(0)
-        assert_eq!(poly.evaluate(&Field64::zero()), c0);
+        assert_eq!(poly.evaluate(&Goldilocks::zero()), c0);
         // f(1)
-        assert_eq!(poly.evaluate(&Field64::ONE), c0 + c1 + c2 + c3);
+        assert_eq!(poly.evaluate(&Goldilocks::ONE), c0 + c1 + c2 + c3);
 
         // f(2)
         assert_eq!(
-            poly.evaluate(&Field64::from(2)),
-            c0 + c1 * Field64::from(2) + c2 * Field64::from(4) + c3 * Field64::from(8)
+            poly.evaluate(&Goldilocks::from(2u32)),
+            c0 + c1 * Goldilocks::from(2u32)
+                + c2 * Goldilocks::from(4u32)
+                + c3 * Goldilocks::from(8u32)
         );
     }
 
     #[test]
     fn test_leading_zeros_trimmed() {
         // Polynomial: f(x) = 1 + 2x, with trailing zeroes
-        let c0 = Field64::from(1);
-        let c1 = Field64::from(2);
-        let poly =
-            WhirDensePolynomial::from_coefficients_vec(vec![c0, c1, Field64::ZERO, Field64::ZERO]);
+        let c0 = Goldilocks::from(1u32);
+        let c1 = Goldilocks::from(2u32);
+        let poly = WhirDensePolynomial::from_coefficients_vec(vec![
+            c0,
+            c1,
+            Goldilocks::ZERO,
+            Goldilocks::ZERO,
+        ]);
 
         // Should be trimmed to degree 1
         assert_eq!(poly.coeffs.len(), 2);
-        assert_eq!(poly.evaluate(&Field64::from(3)), c0 + c1 * Field64::from(3));
+        assert_eq!(
+            poly.evaluate(&Goldilocks::from(3u32)),
+            c0 + c1 * Goldilocks::from(3u32)
+        );
     }
 
     #[test]
     fn test_is_zero_various_cases() {
-        let zero_poly = WhirDensePolynomial::<Field64>::from_coefficients_vec(vec![]);
+        let zero_poly = WhirDensePolynomial::<Goldilocks>::from_coefficients_vec(vec![]);
         assert!(zero_poly.is_zero());
 
         let zero_poly_all_zeros =
-            WhirDensePolynomial::<Field64>::from_coefficients_vec(vec![Field64::ZERO; 5]);
+            WhirDensePolynomial::<Goldilocks>::from_coefficients_vec(vec![Goldilocks::ZERO; 5]);
         assert!(zero_poly_all_zeros.is_zero());
 
         let non_zero_poly =
-            WhirDensePolynomial::<Field64>::from_coefficients_vec(vec![Field64::ONE]);
+            WhirDensePolynomial::<Goldilocks>::from_coefficients_vec(vec![Goldilocks::ONE]);
         assert!(!non_zero_poly.is_zero());
     }
 }

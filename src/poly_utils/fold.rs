@@ -1,4 +1,5 @@
-use ark_ff::Field;
+// use ark_ff::Field;
+use arith::Field;
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
@@ -69,16 +70,19 @@ pub fn compute_fold<F: Field>(
 
 #[cfg(test)]
 mod tests {
-    use ark_ff::{AdditiveGroup, FftField, Field};
+    // use ark_ff::{AdditiveGroup, FftField, Field};
+    use arith::{FFTField, Field};
+    use ark_std::log2;
+    use goldilocks::Goldilocks;
 
     use super::compute_fold;
     use crate::{
-        crypto::fields::Field64,
+        // crypto::fields::Field64,
         ntt::{test_utils::transform_evaluations, transpose},
         poly_utils::{coeffs::CoefficientList, multilinear::MultilinearPoint},
     };
 
-    type F = Field64;
+    type F = Goldilocks;
 
     #[test]
     fn test_folding() {
@@ -94,10 +98,11 @@ mod tests {
         let folding_factor_exp = 1 << folding_factor;
 
         // Create a simple multilinear polynomial f(x₀, ..., x₄) = ∑ xᵢ
-        let poly = CoefficientList::new((0..num_coeffs).map(F::from).collect());
+        let poly = CoefficientList::new((0u32..num_coeffs).map(F::from).collect());
 
         // Get the primitive root of unity for the domain
-        let root_of_unity = F::get_root_of_unity(domain_size).unwrap();
+        // let root_of_unity = F::get_root_of_unity(domain_size).unwrap();
+        let root_of_unity = F::two_adic_generator(log2(domain_size) as usize);
 
         // Pick a specific coset index to evaluate
         let index = 15;
@@ -105,15 +110,15 @@ mod tests {
         let folding_randomness: Vec<_> = (0..folding_factor as u64).map(F::from).collect();
 
         // Compute coset offset = ω^index
-        let coset_offset = root_of_unity.pow([index]);
+        let coset_offset = root_of_unity.exp(index as u128);
         // Compute coset generator = ω^{N / 2^m}
-        let coset_gen = root_of_unity.pow([domain_size / folding_factor_exp]);
+        let coset_gen = root_of_unity.exp((domain_size / folding_factor_exp) as u128);
 
         // Evaluate the polynomial at the points in the coset: γ * g^i
         let poly_eval: Vec<_> = (0..folding_factor_exp)
             .map(|i| {
                 poly.evaluate(&MultilinearPoint::expand_from_univariate(
-                    coset_offset * coset_gen.pow([i]),
+                    coset_offset * coset_gen.exp(i as u128),
                     num_variables,
                 ))
             })
@@ -123,16 +128,17 @@ mod tests {
         let fold_value = compute_fold(
             &poly_eval,
             &folding_randomness,
-            coset_offset.inverse().unwrap(),
-            coset_gen.inverse().unwrap(),
-            F::from(2).inverse().unwrap(),
+            coset_offset.inv().unwrap(),
+            coset_gen.inv().unwrap(),
+            // F::from(2u32).inverse().unwrap(),
+            F::INV_2,
             folding_factor,
         );
 
         // Compute the expected value by folding the polynomial, then evaluating it at ω^{8·index}
         let truth_value = poly.fold(&MultilinearPoint(folding_randomness)).evaluate(
             &MultilinearPoint::expand_from_univariate(
-                root_of_unity.pow([folding_factor_exp * index]),
+                root_of_unity.exp((folding_factor_exp * index) as u128),
                 2,
             ),
         );
@@ -153,18 +159,18 @@ mod tests {
         let folding_factor_exp: u64 = 1 << folding_factor;
 
         // Define the polynomial as f(x) = x for x in 0..32
-        let poly = CoefficientList::new((0..num_coeffs).map(F::from).collect());
+        let poly = CoefficientList::new((0u32..num_coeffs).map(F::from).collect());
 
         // Get root of unity and its inverse
-        let root_of_unity = F::get_root_of_unity(domain_size).unwrap();
-        let root_of_unity_inv = root_of_unity.inverse().unwrap();
+        let root_of_unity = F::two_adic_generator(log2(domain_size) as usize);
+        let root_of_unity_inv = root_of_unity.inv().unwrap();
 
         // Randomness used in folding (e.g., r = [0, 1, 2])
         let folding_randomness: Vec<_> = (0..folding_factor as u64).map(F::from).collect();
 
         // Evaluate polynomial on all domain points: ω^0, ω^1, ..., ω^{255}
         let mut domain_evaluations: Vec<_> = (0..domain_size)
-            .map(|w| root_of_unity.pow([w]))
+            .map(|w| root_of_unity.exp(w as u128))
             .map(|point| {
                 poly.evaluate(&MultilinearPoint::expand_from_univariate(
                     point,
@@ -187,19 +193,19 @@ mod tests {
         transform_evaluations(&mut domain_evaluations, root_of_unity_inv, folding_factor);
 
         // Number of cosets = domain_size / folding_factor_exp
-        let num = domain_size / folding_factor_exp;
+        let num = domain_size / folding_factor_exp as usize;
 
         // Compute inverse of coset generator: ω^{-num}
-        let coset_gen_inv = root_of_unity_inv.pow([num]);
+        let coset_gen_inv = root_of_unity_inv.exp(num as u128);
 
         // For each coset (row in the transposed matrix)...
         for index in 0..num {
             // Compute inverse offset: ω^{-index}
-            let offset_inv = root_of_unity_inv.pow([index]);
+            let offset_inv = root_of_unity_inv.exp(index as u128);
 
             // Slice the unprocessed chunk from the full evaluation table
             let span =
-                (index * folding_factor_exp) as usize..((index + 1) * folding_factor_exp) as usize;
+                (index * folding_factor_exp as usize)..((index + 1) * folding_factor_exp as usize);
 
             // Compute folded value manually using compute_fold on unprocessed input
             let answer_unprocessed = compute_fold(
@@ -207,7 +213,8 @@ mod tests {
                 &folding_randomness,
                 offset_inv,
                 coset_gen_inv,
-                F::from(2).inverse().unwrap(),
+                F::INV_2,
+                // F::from(2u32).inverse().unwrap(),
                 folding_factor,
             );
 
@@ -223,16 +230,16 @@ mod tests {
     #[test]
     fn test_compute_fold_single_layer() {
         // Folding a vector of size 2: f(x) = [1, 3]
-        let f0 = F::from(1);
-        let f1 = F::from(3);
+        let f0 = F::from(1u32);
+        let f1 = F::from(3u32);
         let answers = vec![f0, f1];
 
-        let r = F::from(2); // folding randomness
+        let r = F::from(2u32); // folding randomness
         let folding_randomness = vec![r];
 
-        let coset_offset_inv = F::from(5); // arbitrary inverse offset
-        let coset_gen_inv = F::from(7); // arbitrary generator inverse
-        let two_inv = F::from(2).inverse().unwrap();
+        let coset_offset_inv = F::from(5u32); // arbitrary inverse offset
+        let coset_gen_inv = F::from(7u32); // arbitrary generator inverse
+        let two_inv = F::INV_2; //F::from(2u32).inverse().unwrap();
 
         // g = (f0 + f1 + r * (f0 - f1) * coset_offset_inv) / 2
         // Here coset_index_inv = 1
@@ -255,23 +262,23 @@ mod tests {
     #[test]
     fn test_compute_fold_two_layers() {
         // Define the input evaluations: f(x) = [f00, f01, f10, f11]
-        let f00 = F::from(1);
-        let f01 = F::from(2);
-        let f10 = F::from(3);
-        let f11 = F::from(4);
+        let f00 = F::from(1u32);
+        let f01 = F::from(2u32);
+        let f10 = F::from(3u32);
+        let f11 = F::from(4u32);
 
         // Create the input vector for folding
         let answers = vec![f00, f01, f10, f11];
 
         // Folding randomness used in each layer (innermost first)
-        let r0 = F::from(5); // randomness for layer 1 (first fold)
-        let r1 = F::from(7); // randomness for layer 2 (second fold)
+        let r0 = F::from(5u32); // randomness for layer 1 (first fold)
+        let r1 = F::from(7u32); // randomness for layer 2 (second fold)
         let folding_randomness = vec![r1, r0]; // reversed because fold reads from the back
 
         // Precompute constants
-        let two_inv = F::from(2).inverse().unwrap(); // 1/2 used in folding formula
-        let coset_offset_inv = F::from(9); // offset⁻¹
-        let coset_gen_inv = F::from(3); // generator⁻¹
+        let two_inv = F::INV_2; // F::from(2u32).inverse().unwrap(); // 1/2 used in folding formula
+        let coset_offset_inv = F::from(9u32); // offset⁻¹
+        let coset_gen_inv = F::from(3u32); // generator⁻¹
 
         // --- First layer of folding ---
 
@@ -330,16 +337,16 @@ mod tests {
     #[test]
     fn test_compute_fold_with_zero_randomness() {
         // Inputs: f(x) = [f0, f1]
-        let f0 = F::from(6);
-        let f1 = F::from(2);
+        let f0 = F::from(6u32);
+        let f1 = F::from(2u32);
         let answers = vec![f0, f1];
 
         let r = F::ZERO;
         let folding_randomness = vec![r];
 
-        let two_inv = F::from(2).inverse().unwrap();
-        let coset_offset_inv = F::from(10);
-        let coset_gen_inv = F::from(3);
+        let two_inv = F::INV_2; // F::from(2u32).inverse().unwrap();
+        let coset_offset_inv = F::from(10u32);
+        let coset_gen_inv = F::from(3u32);
 
         let left = f0 + f1;
         // with r = 0, this simplifies to (f0 + f1) / 2
@@ -361,10 +368,10 @@ mod tests {
     fn test_compute_fold_all_zeros() {
         // All values are zero: f(x) = [0, 0, ..., 0]
         let answers = vec![F::ZERO; 8];
-        let folding_randomness = vec![F::from(3); 3];
-        let two_inv = F::from(2).inverse().unwrap();
-        let coset_offset_inv = F::from(4);
-        let coset_gen_inv = F::from(7);
+        let folding_randomness = vec![F::from(3u32); 3];
+        let two_inv = F::INV_2; //F::from(2u32).inverse().unwrap();
+        let coset_offset_inv = F::from(4u32);
+        let coset_gen_inv = F::from(7u32);
 
         // each fold step is (0 + 0 + r * (0 - 0) * _) / 2 = 0
         let expected = F::ZERO;
@@ -391,16 +398,16 @@ mod tests {
         let folding_factor_exp = 1 << folding_factor;
 
         // Domain generator and its inverse (arbitrary but consistent)
-        let domain_gen = F::from(4);
-        let domain_gen_inv = domain_gen.inverse().unwrap();
+        let domain_gen = F::from(4u32);
+        let domain_gen_inv = domain_gen.inv().unwrap();
 
         // Row-major input:
         //   row 0: [a0, a1]
         //   row 1: [b0, b1]
-        let a0 = F::from(1);
-        let a1 = F::from(3);
-        let b0 = F::from(2);
-        let b1 = F::from(4);
+        let a0 = F::from(1u32);
+        let a1 = F::from(3u32);
+        let b0 = F::from(2u32);
+        let b1 = F::from(4u32);
         let mut evals = vec![a0, a1, b0, b1];
 
         // Step 1: Transpose (rows become columns)
@@ -430,7 +437,7 @@ mod tests {
         //
         // For row 0, offset = 1 (coset_offset_inv^j = 1)
         // For row 1, offset = domain_gen_inv
-        let size_inv = F::from(folding_factor_exp as u64).inverse().unwrap();
+        let size_inv = F::from(folding_factor_exp as u64).inv().unwrap();
 
         let expected = vec![
             intt0 * size_inv * F::ONE,
@@ -449,7 +456,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_transform_evaluations_invalid_length() {
-        let mut evals = vec![F::from(1); 6]; // Not a power of 2
+        let mut evals = vec![F::from(1u32); 6]; // Not a power of 2
         transform_evaluations(&mut evals, F::ONE, 2);
     }
 }
